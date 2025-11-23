@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NovaStake - Dashboard</title>
+  <script>
+    const API_BASE = 'http://localhost:4000/api';
+
+    function getToken() {
+      return localStorage.getItem('token');
+    }
+
+    async function loadDashboard() {
+      const token = getToken();
+      if (!token) {
+        alert('No token found. Please login first.');
+        window.location.href = 'login.html';
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/wallet/dashboard-summary`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to load dashboard');
+        }
+
+        const userName = localStorage.getItem('userName') || 'NovaStake User';
+        document.getElementById('userName').textContent = userName;
+        document.getElementById('walletBalance').textContent = data.walletBalance.toFixed(2);
+        document.getElementById('stakedAmount').textContent = data.stakedAmount.toFixed(2);
+        document.getElementById('rewardBalance').textContent = data.rewardBalance.toFixed(8);
+        document.getElementById('dailyRewards').textContent = data.dailyRewardsEstimate.toFixed(8);
+        document.getElementById('monthlyRewards').textContent = data.monthlyRewardsEstimate.toFixed(8);
+      } catch (err) {
+        console.error(err);
+        alert(err.message || 'Failed to load dashboard');
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem('token');
+      localStorage.removeItem('userName');
+      window.location.href = 'login.html';
+    }
+
+    window.addEventListener('DOMContentLoaded', loadDashboard);
+  </script>
+  <style>
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #020617; color: #f9fafb; margin: 0; }
+    header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid rgba(30,64,175,0.8); background: radial-gradient(circle at left, rgba(59,130,246,0.25), transparent 60%), radial-gradient(circle at right, rgba(168,85,247,0.25), transparent 60%), #020617; }
+    .logo { font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; font-size: 0.9rem; color: #e5e7eb; }
+    .nav-links a { margin-left: 1rem; font-size: 0.85rem; color: #9ca3af; text-decoration: none; }
+    .nav-links a:hover { color: #e5e7eb; }
+    .logout-btn { margin-left: 1rem; padding: 0.4rem 0.9rem; border-radius: 999px; border: 1px solid rgba(148,163,184,0.8); background: transparent; color: #e5e7eb; font-size: 0.8rem; cursor: pointer; }
+    main { padding: 1.5rem; max-width: 1100px; margin: 0 auto; }
+    h1 { font-size: 1.7rem; margin-bottom: 0.3rem; }
+    .subtitle { color: #9ca3af; margin-bottom: 1.5rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+    .card { background: radial-gradient(circle at top, rgba(37,99,235,0.25), transparent 60%), #020617; border-radius: 1rem; padding: 1.2rem; border: 1px solid rgba(55,65,81,0.8); box-shadow: 0 18px 40px rgba(15,23,42,0.7); }
+    .label { font-size: 0.75rem; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.25rem; }
+    .value { font-size: 1.1rem; font-weight: 600; }
+    .value span { font-size: 0.9rem; font-weight: 500; color: #9ca3af; margin-left: 0.25rem; }
+    @media (max-width: 640px) { header { flex-direction: column; align-items: flex-start; gap: 0.5rem; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">NovaStake</div>
+    <div class="nav-links">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="withdraw.html">Withdraw</a>
+      <a href="login.html" onclick="logout(); return false;">Logout</a>
+    </div>
+  </header>
+  <main>
+    <h1>Welcome back, <span id="userName">NovaStake User</span></h1>
+    <div class="subtitle">Heres an overview of your wallet, staking, and rewards.</div>
+
+    <section class="grid" aria-label="wallet-summary">
+      <div class="card">
+        <div class="label">Wallet Balance</div>
+        <div class="value"><span id="walletBalance">0.00</span> <span>NST</span></div>
+      </div>
+      <div class="card">
+        <div class="label">Staked Amount</div>
+        <div class="value"><span id="stakedAmount">0.00</span> <span>NST</span></div>
+      </div>
+      <div class="card">
+        <div class="label">Reward Balance</div>
+        <div class="value"><span id="rewardBalance">0.00000000</span> <span>NST</span></div>
+      </div>
+      <div class="card">
+        <div class="label">Daily Rewards (Est.)</div>
+        <div class="value"><span id="dailyRewards">0.00000000</span> <span>NST / day</span></div>
+      </div>
+      <div class="card">
+        <div class="label">Monthly Rewards (Est.)</div>
+        <div class="value"><span id="monthlyRewards">0.00000000</span> <span>NST / month</span></div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

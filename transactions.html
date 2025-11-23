@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NovaStake - Transactions</title>
+  <script>
+    const API_BASE = 'http://localhost:4000/api';
+
+    function getToken() {
+      return localStorage.getItem('token');
+    }
+
+    async function loadTransactions() {
+      const token = getToken();
+      if (!token) {
+        alert('No token found. Please login first.');
+        window.location.href = 'login.html';
+        return;
+      }
+
+      const tbody = document.getElementById('txBody');
+      tbody.innerHTML = '';
+
+      try {
+        const res = await fetch(`${API_BASE}/transactions?page=1&limit=50`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to load transactions');
+
+        const items = data.data || [];
+        if (!items.length) {
+          const tr = document.createElement('tr');
+          const td = document.createElement('td');
+          td.colSpan = 5;
+          td.textContent = 'No transactions yet.';
+          td.style.textAlign = 'center';
+          tr.appendChild(td);
+          tbody.appendChild(tr);
+          return;
+        }
+
+        items.forEach((tx) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${tx.id}</td>
+            <td>${tx.type}</td>
+            <td>${tx.amount.toFixed(2)}</td>
+            <td>${new Date(tx.createdAt).toLocaleString()}</td>
+            <td>${tx.status}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        console.error(err);
+        alert(err.message || 'Failed to load transactions');
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem('token');
+      localStorage.removeItem('userName');
+      window.location.href = 'login.html';
+    }
+
+    window.addEventListener('DOMContentLoaded', loadTransactions);
+  </script>
+  <style>
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #020617; color: #f9fafb; margin: 0; }
+    header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid rgba(30,64,175,0.8); background: radial-gradient(circle at left, rgba(59,130,246,0.25), transparent 60%), radial-gradient(circle at right, rgba(168,85,247,0.25), transparent 60%), #020617; }
+    .logo { font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; font-size: 0.9rem; color: #e5e7eb; }
+    .nav-links a { margin-left: 1rem; font-size: 0.85rem; color: #9ca3af; text-decoration: none; }
+    .nav-links a:hover { color: #e5e7eb; }
+    main { padding: 1.5rem; max-width: 1100px; margin: 0 auto; }
+    h1 { font-size: 1.7rem; margin-bottom: 0.3rem; }
+    .subtitle { color: #9ca3af; margin-bottom: 1.5rem; }
+    .card { background: radial-gradient(circle at top, rgba(37,99,235,0.25), transparent 60%), #020617; border-radius: 1rem; padding: 1.2rem; border: 1px solid rgba(55,65,81,0.8); box-shadow: 0 18px 40px rgba(15,23,42,0.7); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 0.5rem; }
+    th, td { padding: 0.55rem 0.6rem; border-bottom: 1px solid rgba(31,41,55,0.9); text-align: left; }
+    th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: #9ca3af; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">NovaStake</div>
+    <div class="nav-links">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="stake.html">Stake</a>
+      <a href="withdraw.html">Withdraw</a>
+      <a href="transactions.html">History</a>
+      <a href="login.html" onclick="logout(); return false;">Logout</a>
+    </div>
+  </header>
+  <main>
+    <h1>Transaction History</h1>
+    <div class="subtitle">View your staking and withdrawal activity.</div>
+
+    <section class="card" aria-label="transactions-table">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Type</th>
+            <th>Amount</th>
+            <th>Date</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="txBody"></tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>

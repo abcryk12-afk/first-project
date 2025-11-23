@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NovaStake - Stake</title>
+  <script>
+    const API_BASE = 'http://localhost:4000/api';
+
+    function getToken() {
+      return localStorage.getItem('token');
+    }
+
+    async function loadStakePage() {
+      const token = getToken();
+      if (!token) {
+        alert('No token found. Please login first.');
+        window.location.href = 'login.html';
+        return;
+      }
+
+      try {
+        // Load wallet balances
+        const walletRes = await fetch(`${API_BASE}/wallet`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        const wallet = await walletRes.json();
+        if (!walletRes.ok) throw new Error(wallet.error || 'Failed to load wallet');
+        document.getElementById('walletBalance').textContent = wallet.balance.toFixed(2);
+        document.getElementById('stakedBalance').textContent = wallet.stakedBalance.toFixed(2);
+        document.getElementById('rewardBalance').textContent = wallet.rewardBalance.toFixed(8);
+
+        // Load existing stakes
+        await loadStakes();
+      } catch (err) {
+        console.error(err);
+        alert(err.message || 'Failed to load stake page');
+      }
+    }
+
+    async function loadStakes() {
+      const token = getToken();
+      const tbody = document.getElementById('stakesBody');
+      tbody.innerHTML = '';
+
+      try {
+        const res = await fetch(`${API_BASE}/stake`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        const stakes = await res.json();
+        if (!res.ok) throw new Error(stakes.error || 'Failed to load stakes');
+
+        if (!stakes.length) {
+          const tr = document.createElement('tr');
+          const td = document.createElement('td');
+          td.colSpan = 5;
+          td.textContent = 'No staking activity yet.';
+          td.style.textAlign = 'center';
+          tr.appendChild(td);
+          tbody.appendChild(tr);
+          return;
+        }
+
+        stakes.forEach((s) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${s.id}</td>
+            <td>${s.amount.toFixed(2)}</td>
+            <td>${(s.apr || 0).toFixed(2)}%</td>
+            <td>${new Date(s.startDate).toLocaleString()}</td>
+            <td>${s.status}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function handleStake(event) {
+      event.preventDefault();
+      const token = getToken();
+      const amountInput = document.getElementById('stakeAmount');
+      const amount = parseFloat(amountInput.value);
+      if (!amount || amount <= 0) {
+        alert('Enter a valid amount to stake');
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/stake`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ amount }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Stake failed');
+
+        document.getElementById('walletBalance').textContent = data.wallet.balance.toFixed(2);
+        document.getElementById('stakedBalance').textContent = data.wallet.stakedBalance.toFixed(2);
+        document.getElementById('rewardBalance').textContent = data.wallet.rewardBalance.toFixed(8);
+        amountInput.value = '';
+        await loadStakes();
+      } catch (err) {
+        console.error(err);
+        alert(err.message || 'Stake failed');
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem('token');
+      localStorage.removeItem('userName');
+      window.location.href = 'login.html';
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('stakeForm').addEventListener('submit', handleStake);
+      loadStakePage();
+    });
+  </script>
+  <style>
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #020617; color: #f9fafb; margin: 0; }
+    header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid rgba(30,64,175,0.8); background: radial-gradient(circle at left, rgba(59,130,246,0.25), transparent 60%), radial-gradient(circle at right, rgba(168,85,247,0.25), transparent 60%), #020617; }
+    .logo { font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; font-size: 0.9rem; color: #e5e7eb; }
+    .nav-links a { margin-left: 1rem; font-size: 0.85rem; color: #9ca3af; text-decoration: none; }
+    .nav-links a:hover { color: #e5e7eb; }
+    .logout-btn { margin-left: 1rem; padding: 0.4rem 0.9rem; border-radius: 999px; border: 1px solid rgba(148,163,184,0.8); background: transparent; color: #e5e7eb; font-size: 0.8rem; cursor: pointer; }
+    main { padding: 1.5rem; max-width: 1100px; margin: 0 auto; }
+    h1 { font-size: 1.7rem; margin-bottom: 0.3rem; }
+    .subtitle { color: #9ca3af; margin-bottom: 1.5rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.2rem; margin-bottom: 1.5rem; }
+    .card { background: radial-gradient(circle at top, rgba(37,99,235,0.25), transparent 60%), #020617; border-radius: 1rem; padding: 1.2rem; border: 1px solid rgba(55,65,81,0.8); box-shadow: 0 18px 40px rgba(15,23,42,0.7); }
+    .label { font-size: 0.75rem; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.25rem; }
+    .value { font-size: 1.05rem; font-weight: 600; }
+    .value span { font-size: 0.9rem; font-weight: 500; color: #9ca3af; margin-left: 0.25rem; }
+    form { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.75rem; }
+    input { width: 100%; padding: 0.6rem 0.75rem; border-radius: 0.5rem; border: 1px solid #4b5563; background: rgba(15,23,42,0.9); color: #f9fafb; font-size: 0.9rem; }
+    input:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 1px rgba(129,140,248,0.6); }
+    button { margin-top: 0.25rem; width: 100%; padding: 0.7rem 1rem; border-radius: 999px; border: none; background: linear-gradient(to right, #6366f1, #8b5cf6); color: #f9fafb; font-weight: 600; cursor: pointer; font-size: 0.95rem; box-shadow: 0 10px 25px rgba(79,70,229,0.4); }
+    button:hover { transform: translateY(-1px); box-shadow: 0 14px 30px rgba(79,70,229,0.55); }
+    button:active { transform: translateY(0); box-shadow: 0 8px 18px rgba(79,70,229,0.4); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 0.5rem; }
+    th, td { padding: 0.55rem 0.6rem; border-bottom: 1px solid rgba(31,41,55,0.9); text-align: left; }
+    th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: #9ca3af; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">NovaStake</div>
+    <div class="nav-links">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="stake.html">Stake</a>
+      <a href="withdraw.html">Withdraw</a>
+      <a href="transactions.html">History</a>
+      <a href="login.html" onclick="logout(); return false;">Logout</a>
+    </div>
+  </header>
+  <main>
+    <h1>Stake NovaStake (NST)</h1>
+    <div class="subtitle">Lock your NST to start earning staking rewards.</div>
+
+    <section class="grid">
+      <div class="card">
+        <div class="label">Wallet Balance</div>
+        <div class="value"><span id="walletBalance">0.00</span> <span>NST</span></div>
+      </div>
+      <div class="card">
+        <div class="label">Staked Balance</div>
+        <div class="value"><span id="stakedBalance">0.00</span> <span>NST</span></div>
+      </div>
+      <div class="card">
+        <div class="label">Reward Balance</div>
+        <div class="value"><span id="rewardBalance">0.00000000</span> <span>NST</span></div>
+      </div>
+    </section>
+
+    <section class="card" aria-label="stake-form">
+      <div class="label">Enter amount to stake</div>
+      <form id="stakeForm">
+        <input id="stakeAmount" type="number" step="0.00000001" min="0" placeholder="0.00" />
+        <button type="submit">Stake Now</button>
+      </form>
+    </section>
+
+    <section class="card" style="margin-top: 1.2rem;" aria-label="stakes-table">
+      <div class="label">Your Staking Activity</div>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Amount</th>
+            <th>APR</th>
+            <th>Start Date</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="stakesBody"></tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>
