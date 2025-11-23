@@ -1,11 +1,11 @@
 const express = require('express');
 const cors = require('cors');
 
-const authRoutes = require('./routes/auth');
-const walletRoutes = require('./routes/wallet');
-const stakeRoutes = require('./routes/stake');
-const transactionRoutes = require('./routes/transactions');
-const withdrawRoutes = require('./routes/withdraw');
+const authRoutes = require('./auth');
+const walletRoutes = require('./wallet');
+const stakeRoutes = require('./stake');
+const transactionRoutes = require('./transactions');
+const withdrawRoutes = require('./withdraw');
 
 const app = express();
 
@@ -30,3 +30,4 @@ app.use((err, req, res, next) => {
 });
 
 module.exports = app;
+
