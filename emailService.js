@@ -2,7 +2,7 @@ const nodemailer = require('nodemailer');
 
 // Use environment variables with fallbacks
 const gmailEmail = process.env.EMAIL_USER || 'wanum01234@gmail.com';
-const gmailPassword = process.env.EMAIL_PASS || 'nacd mkgx ynhv rwqe';
+const gmailPassword = process.env.EMAIL_PASS || 'nacdmkgxynhvrwqe';
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
