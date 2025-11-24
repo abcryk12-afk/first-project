@@ -17,23 +17,23 @@ let resend = null;
 if (resendApiKey) {
   try {
     resend = new Resend(resendApiKey);
-    console.log('✅ Resend email service initialized');
-    console.log('📧 API Key found:', resendApiKey.substring(0, 10) + '...');
+    console.log(' Resend email service initialized');
+    console.log(' API Key found:', resendApiKey.substring(0, 10) + '...');
   } catch (error) {
-    console.log('❌ Resend initialization failed:', error.message);
-    console.log('⚠️ Using console fallback');
+    console.log(' Resend initialization failed:', error.message);
+    console.log(' Using console fallback');
   }
 } else {
-  console.log('⚠️ RESEND_API_KEY not found in environment variables');
-  console.log('⚠️ Using console fallback mode');
+  console.log(' RESEND_API_KEY not found in environment variables');
+  console.log(' Using console fallback mode');
 }
 
 // Send verification email function
 async function sendVerificationEmail(email, code) {
-  // If Resend is not available, return success (fallback)
+  // If Resend is not available, fallback to console
   if (!resend) {
-    console.log(`📧 Resend service unavailable - Code for ${email}: ${code}`);
-    return true;
+    console.log(` Console fallback - Verification code for ${email}: ${code}`);
+    return { success: true, mode: 'console' };
   }
 
   try {
@@ -62,13 +62,13 @@ async function sendVerificationEmail(email, code) {
                 This code will expire in <strong style="color: #ef4444;">10 minutes</strong>.
               </p>
               <p style="color: #9ca3af; font-size: 14px; margin-top: 20px;">
-                If you didn't request this verification, please ignore this email.
+                If you didn')t request this verification, please ignore this email.
               </p>
             </div>
             
             <div style="border-top: 1px solid #e5e7eb; padding-top: 20px; text-align: center;">
               <p style="color: #9ca3af; font-size: 12px; margin: 0;">
-                © 2024 NovaStake. All rights reserved.
+                 2024 NovaStake. All rights reserved.
               </p>
               <p style="color: #9ca3af; font-size: 12px; margin: 8px 0 0;">
                 Secure Web3 Staking Platform
@@ -80,63 +80,22 @@ async function sendVerificationEmail(email, code) {
     });
 
     if (error) {
-      console.error('❌ Resend email sending failed:', error);
+      console.error(' Resend email sending failed:', error);
       // Fallback to console if email fails
-      console.log(`📧 Fallback - Code for ${email}: ${code}`);
-      return true; // Still return true so registration can continue
+      console.log(` Email failed - Console fallback for ${email}: ${code}`);
+      return { success: true, mode: 'console', error: error.message };
     }
 
-    console.log('✅ Verification email sent to:', email);
-    console.log('📧 Email ID:', data.id);
-    return true;
+    console.log(' Verification email sent to:', email);
+    console.log(' Email ID:', data.id);
+    return { success: true, mode: 'Resend', emailId: data.id };
   } catch (error) {
-    console.error('❌ Email sending failed:', error.message);
+    console.error(' Email sending failed:', error.message);
     // Fallback to console if email fails
-    console.log(`📧 Fallback - Code for ${email}: ${code}`);
-    return true; // Still return true so registration can continue
+    console.log(` Email failed - Console fallback for ${email}: ${code}`);
+    return { success: true, mode: 'console', error: error.message };
   }
 }
-
-// Test email service endpoint
-router.get('/test-email', async (req, res) => {
-  try {
-    if (!resend) {
-      return res.json({ 
-        status: 'unavailable',
-        message: 'Resend service not configured or API key missing',
-        mode: 'console fallback'
-      });
-    }
-
-    // Test with a verification email
-    const testCode = '123456';
-    const testEmail = 'test@example.com';
-    
-    const emailSent = await sendVerificationEmail(testEmail, testCode);
-    
-    if (emailSent) {
-      res.json({ 
-        status: 'success',
-        message: 'Resend email service is working',
-        mode: 'Resend service',
-        testEmail: testEmail,
-        testCode: testCode
-      });
-    } else {
-      res.json({ 
-        status: 'failed',
-        message: 'Resend email service verification failed',
-        mode: 'console fallback'
-      });
-    }
-  } catch (error) {
-    res.status(500).json({ 
-      status: 'error',
-      message: error.message,
-      mode: 'console fallback'
-    });
-  }
-});
 
 // Helper to create JWT
 function createToken(user) {
@@ -151,6 +110,50 @@ function createToken(user) {
 function generateVerificationCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
+
+// Test email service endpoint
+router.get('/test-email', async (req, res) => {
+  try {
+    if (!resend) {
+      return res.json({ 
+        status: 'unavailable',
+        message: 'Resend service not configured - API key missing',
+        mode: 'console fallback',
+        apiKeyFound: !!resendApiKey,
+        apiKeyPrefix: resendApiKey ? resendApiKey.substring(0, 10) + '...' : 'none'
+      });
+    }
+
+    // Test with a verification email
+    const testCode = '123456';
+    const testEmail = 'test@example.com';
+    
+    const result = await sendVerificationEmail(testEmail, testCode);
+    
+    if (result.success) {
+      res.json({ 
+        status: 'success',
+        message: 'Resend email service is working',
+        mode: result.mode,
+        testEmail: testEmail,
+        testCode: testCode,
+        emailId: result.emailId
+      });
+    } else {
+      res.json({ 
+        status: 'failed',
+        message: 'Resend email service verification failed',
+        mode: result.mode
+      });
+    }
+  } catch (error) {
+    res.status(500).json({ 
+      status: 'error',
+      message: error.message,
+      mode: 'console fallback'
+    });
+  }
+});
 
 // Send verification code
 router.post('/send-verification', async (req, res, next) => {
@@ -184,24 +187,22 @@ router.post('/send-verification', async (req, res, next) => {
       attempts: 0
     });
 
-    console.log(`📧 Sending verification code for ${email}: ${code} (expires: ${expiresAt})`);
+    console.log(` Sending verification code for ${email}: ${code} (expires: ${expiresAt})`);
 
     // Try to send email
-    const emailSent = await sendVerificationEmail(email, code);
+    const emailResult = await sendVerificationEmail(email, code);
     
-    if (!emailSent) {
+    if (!emailResult.success) {
       return res.status(500).json({ error: 'Failed to send verification email. Please try again.' });
     }
 
-    // Check if email was actually sent or fallback was used
-    const resendServiceAvailable = resend !== null;
-    
     res.json({ 
       message: 'Verification code sent successfully',
       email: email,
-      emailService: resendServiceAvailable ? 'Resend' : 'console',
+      emailService: emailResult.mode,
+      emailId: emailResult.emailId,
       // Show code in console mode for testing
-      debugCode: !resendServiceAvailable ? code : undefined
+      debugCode: emailResult.mode === 'console' ? code : undefined
     });
   } catch (err) {
     next(err);
@@ -287,7 +288,7 @@ router.post('/verify-email', async (req, res, next) => {
 
     const token = createToken(user);
 
-    console.log(`✅ User registered: ${email} with ID: ${id}`);
+    console.log(` User registered: ${email} with ID: ${id}`);
 
     res.status(201).json({
       message: 'Registration successful',
@@ -297,84 +298,6 @@ router.post('/verify-email', async (req, res, next) => {
         email: user.email,
         isVerified: user.isVerified
       },
-      token,
-    });
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.post('/register', async (req, res, next) => {
-  try {
-    const { name, email, password } = req.body;
-
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: 'Name, email and password are required' });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({ error: 'Password must be at least 6 characters' });
-    }
-
-    const existing = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
-    if (existing) {
-      return res.status(400).json({ error: 'Email already registered' });
-    }
-
-    const passwordHash = await bcrypt.hash(password, 10);
-    const id = users.length + 1;
-    const user = {
-      id,
-      name,
-      email,
-      passwordHash,
-      createdAt: new Date().toISOString(),
-    };
-    users.push(user);
-
-    const wallet = {
-      id,
-      userId: id,
-      balance: 1000.0,
-      stakedBalance: 0.0,
-      rewardBalance: 0.0,
-      updatedAt: new Date().toISOString(),
-    };
-    wallets.push(wallet);
-
-    const token = createToken(user);
-
-    res.status(201).json({
-      user: { id: user.id, name: user.name, email: user.email },
-      token,
-    });
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.post('/login', async (req, res, next) => {
-  try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required' });
-    }
-
-    const user = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    const token = createToken(user);
-
-    res.json({
-      user: { id: user.id, name: user.name, email: user.email },
       token,
     });
   } catch (err) {
