@@ -6,6 +6,7 @@ const walletRoutes = require('./routes/wallet');
 const stakeRoutes = require('./routes/stake');
 const transactionRoutes = require('./routes/transactions');
 const withdrawRoutes = require('./routes/withdraw');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.use('/api/wallet', walletRoutes);
 app.use('/api/stake', stakeRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/withdraw', withdrawRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Simple error handler
 app.use((err, req, res, next) => {
