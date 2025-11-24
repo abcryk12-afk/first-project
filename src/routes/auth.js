@@ -1,7 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-let Resend = null;
+const Resend = require('resend');
 const { users, wallets } = require('../data/store');
 const { JWT_SECRET } = require('../middleware/auth');
 
@@ -10,19 +10,22 @@ const router = express.Router();
 // Email verification storage (in-memory for now)
 const verificationCodes = new Map();
 
-// Initialize Resend only if API key is available
-try {
-  Resend = require('resend');
-  
-  // Create Resend instance only if we have valid API key
-  if (process.env.RESEND_API_KEY) {
-    var resend = new Resend(process.env.RESEND_API_KEY);
+// Initialize Resend with API key
+const resendApiKey = process.env.RESEND_API_KEY;
+let resend = null;
+
+if (resendApiKey) {
+  try {
+    resend = new Resend(resendApiKey);
     console.log('✅ Resend email service initialized');
-  } else {
-    console.log('⚠️ Resend API key not found, using console fallback');
+    console.log('📧 API Key found:', resendApiKey.substring(0, 10) + '...');
+  } catch (error) {
+    console.log('❌ Resend initialization failed:', error.message);
+    console.log('⚠️ Using console fallback');
   }
-} catch (error) {
-  console.log('⚠️ Resend not available, using console fallback');
+} else {
+  console.log('⚠️ RESEND_API_KEY not found in environment variables');
+  console.log('⚠️ Using console fallback mode');
 }
 
 // Send verification email function
