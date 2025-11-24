@@ -1,7 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const Resend = require('resend');
+const { Resend } = require('resend');
 const { users, wallets } = require('../data/store');
 const { JWT_SECRET } = require('../middleware/auth');
 
