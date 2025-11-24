@@ -17,22 +17,22 @@ let resend = null;
 if (resendApiKey) {
   try {
     resend = new Resend(resendApiKey);
-    console.log('✅ Resend email service initialized');
-    console.log('📧 API Key found:', resendApiKey.substring(0, 10) + '...');
+    console.log(' Resend email service initialized');
+    console.log(' API Key found:', resendApiKey.substring(0, 10) + '...');
   } catch (error) {
-    console.log('❌ Resend initialization failed:', error.message);
-    console.log('⚠️ Using console fallback');
+    console.log(' Resend initialization failed:', error.message);
+    console.log(' Using console fallback');
   }
 } else {
-  console.log('⚠️ RESEND_API_KEY not found in environment variables');
-  console.log('⚠️ Using console fallback mode');
+  console.log(' RESEND_API_KEY not found in environment variables');
+  console.log(' Using console fallback mode');
 }
 
 // Send verification email function
 async function sendVerificationEmail(email, code) {
   // If Resend is not available, fallback to console
   if (!resend) {
-    console.log(`📧 Console fallback - Verification code for ${email}: ${code}`);
+    console.log(` Console fallback - Verification code for ${email}: ${code}`);
     return { success: true, mode: 'console' };
   }
 

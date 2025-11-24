@@ -8,4 +8,5 @@ const server = http.createServer(app);
 
 server.listen(PORT, () => {
   console.log(`NovaStake backend running on http://localhost:${PORT}`);
+  console.log(' Server started successfully');
 });
