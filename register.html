@@ -5,91 +5,563 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>NovaStake - Register</title>
   <script>
-    const API_BASE = 'http://localhost:4000/api';
+    const API_BASE = 'https://first-project-8p98.onrender.com/api';
 
-    async function handleRegister(event) {
+    // Global variables
+    let userData = {};
+    let verificationCode = '';
+    let timerInterval;
+    let timeLeft = 600; // 10 minutes in seconds
+
+    // Step 1: Send verification code
+    async function sendVerificationCode(event) {
       event.preventDefault();
+      
       const name = document.getElementById('name').value.trim();
       const email = document.getElementById('email').value.trim();
-      const password = document.getElementById('password').value;
-      const confirmPassword = document.getElementById('confirmPassword').value;
-
-      if (!name || !email || !password || !confirmPassword) {
-        alert('Please fill in all fields');
+      
+      if (!name || !email) {
+        showMessage('Please enter your name and email', 'error');
         return;
       }
-      if (password !== confirmPassword) {
-        alert('Passwords do not match');
+      
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        showMessage('Please enter a valid email address', 'error');
+        return;
+      }
+      
+      showLoading(true);
+      
+      try {
+        const res = await fetch(`${API_BASE}/auth/send-verification`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+        const data = await res.json();
+        
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to send verification code');
+        }
+        
+        // Store user data for step 2
+        userData = { name, email };
+        
+        // Show success message
+        if (data.emailService === 'console') {
+          showMessage(`Verification code sent to ${email}! Code: ${data.debugCode}`, 'success');
+        } else if (data.emailService === 'Resend') {
+          showMessage(`Verification code sent to ${email}! Please check your inbox (including spam folder).`, 'success');
+        } else {
+          showMessage(`Verification code sent to ${email}! Please check your inbox.`, 'success');
+        }
+        
+        // Move to step 2
+        showVerificationStep();
+        
+        // Start countdown timer
+        startTimer();
+        
+      } catch (err) {
+        console.error(err);
+        showMessage(err.message || 'Failed to send verification code', 'error');
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    // Step 2: Verify code and complete registration
+    async function verifyAndRegister(event) {
+      event.preventDefault();
+      
+      const code = getVerificationCode();
+      
+      if (code.length !== 6) {
+        showMessage('Please enter complete verification code', 'error');
         return;
       }
 
       try {
-        const res = await fetch(`${API_BASE}/auth/register`, {
+        const res = await fetch(`${API_BASE}/auth/verify-email`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, email, password }),
+          body: JSON.stringify({ 
+            email: userData.email, 
+            code: code,
+            name: userData.name,
+            password: userData.password
+          }),
         });
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(data.error || 'Registration failed');
+          throw new Error(data.error || 'Verification failed');
         }
 
+        // Registration successful
         localStorage.setItem('token', data.token);
         localStorage.setItem('userName', data.user.name || '');
-
-        window.location.href = 'withdraw.html';
+        
+        showMessage('Registration successful! Redirecting...', 'success');
+        setTimeout(() => {
+          window.location.href = 'dashboard.html';
+        }, 2000);
+        
       } catch (err) {
         console.error(err);
-        alert(err.message || 'Registration failed');
+        showMessage(err.message || 'Verification failed', 'error');
       }
     }
 
+    // Resend verification code
+    async function resendCode() {
+      try {
+        const res = await fetch(`${API_BASE}/auth/send-verification`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: userData.email }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to resend code');
+        }
+
+        showMessage('New verification code sent', 'success');
+        resetTimer();
+        clearCodeInputs();
+        
+      } catch (err) {
+        console.error(err);
+        showMessage(err.message || 'Failed to resend code', 'error');
+      }
+    }
+
+    // Show verification step
+    function showVerificationStep() {
+      document.getElementById('registrationStep').style.display = 'none';
+      document.getElementById('verificationStep').style.display = 'block';
+      document.getElementById('userEmail').textContent = userData.email;
+    }
+
+    // Show registration step
+    function showRegistrationStep() {
+      document.getElementById('registrationStep').style.display = 'block';
+      document.getElementById('verificationStep').style.display = 'none';
+    }
+
+    // Timer functions
+    function startTimer() {
+      timeLeft = 600; // Reset to 10 minutes
+      updateTimerDisplay();
+      
+      timerInterval = setInterval(() => {
+        timeLeft--;
+        updateTimerDisplay();
+        
+        if (timeLeft <= 0) {
+          clearInterval(timerInterval);
+          showMessage('Verification code expired. Please request a new one.', 'error');
+          document.getElementById('resendBtn').disabled = false;
+          document.getElementById('verifyBtn').disabled = true;
+        }
+      }, 1000);
+    }
+
+    function resetTimer() {
+      clearInterval(timerInterval);
+      startTimer();
+      document.getElementById('resendBtn').disabled = true;
+      document.getElementById('verifyBtn').disabled = false;
+    }
+
+    function updateTimerDisplay() {
+      const minutes = Math.floor(timeLeft / 60);
+      const seconds = timeLeft % 60;
+      const display = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      document.getElementById('timerDisplay').textContent = display;
+      
+      if (timeLeft <= 60) {
+        document.getElementById('timerDisplay').style.color = '#ef4444';
+      } else {
+        document.getElementById('timerDisplay').style.color = '#10b981';
+      }
+    }
+
+    // Show message function
+    function showMessage(message, type) {
+      const messageDiv = document.getElementById('message');
+      messageDiv.textContent = message;
+      messageDiv.className = `message ${type}`;
+      messageDiv.style.display = 'block';
+      
+      setTimeout(() => {
+        messageDiv.style.display = 'none';
+      }, 5000);
+    }
+
+    // Input validation
+    function validateCodeInput(input) {
+      // Only allow numbers
+      input.value = input.value.replace(/[^0-9]/g, '');
+      
+      // Auto-focus next input
+      if (input.value.length === 1 && input.nextElementSibling && input.nextElementSibling.classList.contains('code-input')) {
+        input.nextElementSibling.focus();
+      }
+    }
+
+    // Handle backspace in code inputs
+    function handleCodeBackspace(event, input) {
+      if (event.key === 'Backspace' && input.value === '' && input.previousElementSibling && input.previousElementSibling.classList.contains('code-input')) {
+        input.previousElementSibling.focus();
+      }
+    }
+
+    // Get full verification code from inputs
+    function getVerificationCode() {
+      const inputs = document.querySelectorAll('.code-input');
+      let code = '';
+      inputs.forEach(input => {
+        code += input.value;
+      });
+      return code;
+    }
+
+    // Clear code inputs
+    function clearCodeInputs() {
+      const inputs = document.querySelectorAll('.code-input');
+      inputs.forEach(input => {
+        input.value = '';
+      });
+      inputs[0].focus();
+    }
+
+    // Initialize
     window.addEventListener('DOMContentLoaded', () => {
-      document.getElementById('registerForm').addEventListener('submit', handleRegister);
+      document.getElementById('registerForm').addEventListener('submit', sendVerificationCode);
+      document.getElementById('verificationForm').addEventListener('submit', verifyAndRegister);
+      document.getElementById('resendBtn').addEventListener('click', resendCode);
+      document.getElementById('backBtn').addEventListener('click', showRegistrationStep);
+      
+      // Setup code input handlers
+      const codeInputs = document.querySelectorAll('.code-input');
+      codeInputs.forEach((input, index) => {
+        input.addEventListener('input', () => validateCodeInput(input));
+        input.addEventListener('keydown', (e) => handleCodeBackspace(e, input));
+        input.addEventListener('paste', (e) => {
+          e.preventDefault();
+          const pastedData = e.clipboardData.getData('text').replace(/[^0-9]/g, '').slice(0, 6);
+          for (let i = 0; i < pastedData.length && i < codeInputs.length; i++) {
+            codeInputs[i].value = pastedData[i];
+          }
+          if (pastedData.length < codeInputs.length) {
+            codeInputs[pastedData.length].focus();
+          }
+        });
+      });
     });
   </script>
   <style>
-    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #020617; color: #f9fafb; margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-    .card { width: 100%; max-width: 480px; background: radial-gradient(circle at top, rgba(59,130,246,0.25), transparent 60%), radial-gradient(circle at bottom, rgba(168,85,247,0.25), transparent 60%), #020617; border-radius: 1rem; padding: 1.75rem; box-shadow: 0 20px 40px rgba(15,23,42,0.8); border: 1px solid rgba(148,163,184,0.3); }
-    h1 { font-size: 1.6rem; margin-bottom: 0.25rem; }
-    p { margin: 0.25rem 0 1.25rem; color: #9ca3af; }
-    form { display: flex; flex-direction: column; gap: 0.9rem; }
-    label { font-size: 0.85rem; color: #e5e7eb; }
-    input { width: 100%; padding: 0.6rem 0.75rem; border-radius: 0.5rem; border: 1px solid #4b5563; background: rgba(15,23,42,0.9); color: #f9fafb; font-size: 0.9rem; }
-    input:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 1px rgba(129,140,248,0.6); }
-    button { margin-top: 0.5rem; width: 100%; padding: 0.7rem 1rem; border-radius: 999px; border: none; background: linear-gradient(to right, #6366f1, #8b5cf6); color: #f9fafb; font-weight: 600; cursor: pointer; font-size: 0.95rem; box-shadow: 0 10px 25px rgba(79,70,229,0.4); }
-    button:hover { transform: translateY(-1px); box-shadow: 0 14px 30px rgba(79,70,229,0.55); }
-    button:active { transform: translateY(0); box-shadow: 0 8px 18px rgba(79,70,229,0.4); }
-    .alt { margin-top: 0.75rem; font-size: 0.85rem; color: #9ca3af; text-align: center; }
-    .alt a { color: #a5b4fc; text-decoration: none; }
-    .alt a:hover { text-decoration: underline; }
+    body { 
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
+      background: #020617; 
+      color: #f9fafb; 
+      margin: 0; 
+      padding: 0; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      min-height: 100vh; 
+    }
+    
+    .card { 
+      width: 100%; 
+      max-width: 480px; 
+      background: radial-gradient(circle at top, rgba(59,130,246,0.25), transparent 60%), radial-gradient(circle at bottom, rgba(168,85,247,0.25), transparent 60%), #020617; 
+      border-radius: 1rem; 
+      padding: 2rem; 
+      box-shadow: 0 20px 40px rgba(15,23,42,0.8); 
+      border: 1px solid rgba(148,163,184,0.3); 
+    }
+    
+    h1 { 
+      font-size: 1.6rem; 
+      margin-bottom: 0.25rem; 
+      background: linear-gradient(45deg, #6366f1, #8b5cf6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    p { 
+      margin: 0.25rem 0 1.25rem; 
+      color: #9ca3af; 
+    }
+    
+    .step-indicator {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 1.5rem;
+      gap: 0.5rem;
+    }
+    
+    .step {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(148, 163, 184, 0.3);
+      transition: all 0.3s ease;
+    }
+    
+    .step.active {
+      background: #6366f1;
+      transform: scale(1.2);
+    }
+    
+    form { 
+      display: flex; 
+      flex-direction: column; 
+      gap: 1rem; 
+    }
+    
+    label { 
+      font-size: 0.85rem; 
+      color: #e5e7eb; 
+      font-weight: 500;
+    }
+    
+    input { 
+      width: 100%; 
+      padding: 0.75rem 1rem; 
+      border-radius: 0.5rem; 
+      border: 1px solid #4b5563; 
+      background: rgba(15,23,42,0.9); 
+      color: #f9fafb; 
+      font-size: 0.9rem; 
+      transition: all 0.3s ease;
+    }
+    
+    input:focus { 
+      outline: none; 
+      border-color: #6366f1; 
+      box-shadow: 0 0 0 1px rgba(129,140,248,0.6); 
+    }
+    
+    button { 
+      margin-top: 0.5rem; 
+      width: 100%; 
+      padding: 0.75rem 1rem; 
+      border-radius: 0.5rem; 
+      border: none; 
+      background: linear-gradient(to right, #6366f1, #8b5cf6); 
+      color: #f9fafb; 
+      font-weight: 600; 
+      cursor: pointer; 
+      font-size: 0.95rem; 
+      box-shadow: 0 10px 25px rgba(79,70,229,0.4); 
+      transition: all 0.3s ease;
+    }
+    
+    button:hover:not(:disabled) { 
+      transform: translateY(-1px); 
+      box-shadow: 0 14px 30px rgba(79,70,229,0.55); 
+    }
+    
+    button:active:not(:disabled) { 
+      transform: translateY(0); 
+      box-shadow: 0 8px 18px rgba(79,70,229,0.4); 
+    }
+    
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    .secondary-btn {
+      background: transparent;
+      border: 1px solid #6366f1;
+      color: #6366f1;
+      box-shadow: none;
+    }
+    
+    .secondary-btn:hover:not(:disabled) {
+      background: rgba(99, 102, 241, 0.1);
+    }
+    
+    .verification-container {
+      text-align: center;
+      padding: 1rem 0;
+    }
+    
+    .code-inputs {
+      display: flex;
+      justify-content: center;
+      gap: 0.5rem;
+      margin: 1.5rem 0;
+    }
+    
+    .code-input {
+      width: 45px;
+      height: 50px;
+      text-align: center;
+      font-size: 1.5rem;
+      font-weight: 600;
+      border: 2px solid #4b5563;
+      background: rgba(15,23,42,0.9);
+      color: #f9fafb;
+      border-radius: 0.5rem;
+    }
+    
+    .code-input:focus {
+      border-color: #6366f1;
+      box-shadow: 0 0 0 1px rgba(129,140,248,0.6);
+    }
+    
+    .timer-container {
+      margin: 1rem 0;
+      font-size: 0.9rem;
+      color: #9ca3af;
+    }
+    
+    #timerDisplay {
+      font-weight: 600;
+      font-size: 1.1rem;
+      color: #10b981;
+      transition: color 0.3s ease;
+    }
+    
+    .message {
+      padding: 0.75rem 1rem;
+      border-radius: 0.5rem;
+      margin: 1rem 0;
+      text-align: center;
+      font-size: 0.9rem;
+      display: none;
+    }
+    
+    .message.success {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #10b981;
+    }
+    
+    .message.error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #ef4444;
+    }
+    
+    .alt { 
+      margin-top: 1rem; 
+      font-size: 0.85rem; 
+      color: #9ca3af; 
+      text-align: center; 
+    }
+    
+    .alt a { 
+      color: #a5b4fc; 
+      text-decoration: none; 
+    }
+    
+    .alt a:hover { 
+      text-decoration: underline; 
+    }
+    
+    .verification-step {
+      display: none;
+    }
+    
+    .email-display {
+      background: rgba(99, 102, 241, 0.1);
+      padding: 0.75rem 1rem;
+      border-radius: 0.5rem;
+      margin: 1rem 0;
+      border: 1px solid rgba(99, 102, 241, 0.2);
+    }
+    
+    .email-display strong {
+      color: #6366f1;
+    }
   </style>
 </head>
 <body>
   <div class="card">
-    <h1>Create a NovaStake Account</h1>
-    <p>Register to start staking and earning rewards.</p>
-    <form id="registerForm">
-      <div>
-        <label for="name">Full Name</label>
-        <input id="name" type="text" placeholder="Jane Doe" required />
+    <!-- Step 1: Registration -->
+    <div id="registrationStep" class="registration-step">
+      <div class="step-indicator">
+        <div class="step active"></div>
+        <div class="step"></div>
       </div>
-      <div>
-        <label for="email">Email</label>
-        <input id="email" type="email" placeholder="you@example.com" required />
+      
+      <h1>Create a NovaStake Account</h1>
+      <p>Register to start staking and earning rewards.</p>
+      
+      <div id="message" class="message"></div>
+      
+      <form id="registerForm">
+        <div>
+          <label for="name">Full Name</label>
+          <input id="name" type="text" placeholder="Jane Doe" required />
+        </div>
+        <div>
+          <label for="email">Email</label>
+          <input id="email" type="email" placeholder="you@example.com" required />
+        </div>
+        <div>
+          <label for="password">Password</label>
+          <input id="password" type="password" placeholder="••••••••" required minlength="8" />
+        </div>
+        <div>
+          <label for="confirmPassword">Confirm Password</label>
+          <input id="confirmPassword" type="password" placeholder="••••••••" required minlength="8" />
+        </div>
+        <button type="submit">Send Verification Code</button>
+      </form>
+      
+      <div class="alt">
+        Already have an account? <a href="login.html">Login</a>
       </div>
-      <div>
-        <label for="password">Password</label>
-        <input id="password" type="password" placeholder="••••••••" required />
+    </div>
+
+    <!-- Step 2: Email Verification -->
+    <div id="verificationStep" class="verification-step">
+      <div class="step-indicator">
+        <div class="step"></div>
+        <div class="step active"></div>
       </div>
-      <div>
-        <label for="confirmPassword">Confirm Password</label>
-        <input id="confirmPassword" type="password" placeholder="••••••••" required />
+      
+      <h1>Verify Your Email</h1>
+      <p>We've sent a 6-digit code to your email</p>
+      
+      <div class="email-display">
+        <strong id="userEmail"></strong>
       </div>
-      <button type="submit">Register</button>
-    </form>
-    <div class="alt">
-      Already have an account? <a href="login.html">Login</a>
+      
+      <div id="message" class="message"></div>
+      
+      <form id="verificationForm">
+        <div class="verification-container">
+          <label>Enter Verification Code</label>
+          <div class="code-inputs">
+            <input type="text" class="code-input" maxlength="1" pattern="[0-9]" inputmode="numeric" required />
+            <input type="text" class="code-input" maxlength="1" pattern="[0-9]" inputmode="numeric" required />
+            <input type="text" class="code-input" maxlength="1" pattern="[0-9]" inputmode="numeric" required />
+            <input type="text" class="code-input" maxlength="1" pattern="[0-9]" inputmode="numeric" required />
+            <input type="text" class="code-input" maxlength="1" pattern="[0-9]" inputmode="numeric" required />
+            <input type="text" class="code-input" maxlength="1" pattern="[0-9]" inputmode="numeric" required />
+          </div>
+        </div>
+        
+        <div class="timer-container">
+          Code expires in: <span id="timerDisplay">10:00</span>
+        </div>
+        
+        <button type="submit" id="verifyBtn">Verify & Complete Registration</button>
+        <button type="button" id="resendBtn" class="secondary-btn" style="margin-top: 0.5rem;" disabled>Resend Code</button>
+        <button type="button" id="backBtn" class="secondary-btn" style="margin-top: 0.5rem;">Back</button>
+      </form>
     </div>
   </div>
 </body>
