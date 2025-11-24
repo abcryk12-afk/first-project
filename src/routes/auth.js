@@ -12,7 +12,7 @@ const verificationCodes = new Map();
 
 // Initialize Gmail SMTP transporter
 const gmailEmail = process.env.EMAIL_USER || 'wanum01234@gmail.com';
-const gmailPassword = process.env.EMAIL_PASS || 'yocbixqhzciwvkfx';
+const gmailPassword = process.env.EMAIL_PASS || 'nacd mkgx ynhv rwqe';
 
 let transporter = null;
 
