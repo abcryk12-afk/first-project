@@ -19,7 +19,9 @@ let transporter = null;
 if (gmailEmail && gmailPassword) {
   try {
     transporter = nodemailer.createTransport({
-      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true, // true for 465 (SSL), false for other ports
       auth: {
         user: gmailEmail,
         pass: gmailPassword
@@ -189,7 +191,9 @@ async function diagnoseGmailSMTP() {
     console.log('🔗 Testing Gmail SMTP connection...');
     
     const testTransporter = nodemailer.createTransport({
-      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true, // true for 465 (SSL), false for other ports
       auth: {
         user: gmailEmail,
         pass: gmailPassword
@@ -228,7 +232,9 @@ async function diagnoseGmailSMTP() {
       console.log('🔐 Testing Gmail authentication...');
       
       const authTransporter = nodemailer.createTransport({
-        service: 'gmail',
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true, // true for 465 (SSL), false for other ports
         auth: {
           user: gmailEmail,
           pass: gmailPassword
