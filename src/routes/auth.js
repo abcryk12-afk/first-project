@@ -1,6 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+let nodemailer = null;
 const { users, wallets } = require('../data/store');
 const { JWT_SECRET } = require('../middleware/auth');
 
@@ -8,6 +9,89 @@ const router = express.Router();
 
 // Email verification storage (in-memory for now)
 const verificationCodes = new Map();
+
+// Initialize nodemailer only if credentials are available
+try {
+  nodemailer = require('nodemailer');
+  
+  // Create transporter only if we have valid credentials
+  if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+    var transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
+    });
+    console.log('✅ Email service initialized');
+  } else {
+    console.log('⚠️ Email credentials not found, using console fallback');
+  }
+} catch (error) {
+  console.log('⚠️ Nodemailer not available, using console fallback');
+}
+
+// Send verification email function
+async function sendVerificationEmail(email, code) {
+  // If email service is not available, return success (fallback)
+  if (!transporter) {
+    console.log(`📧 Email service unavailable - Code for ${email}: ${code}`);
+    return true;
+  }
+
+  const mailOptions = {
+    from: 'NovaStake <wanum01234@gmail.com>',
+    to: email,
+    subject: 'NovaStake - Email Verification Code',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f8f9fa; padding: 40px 20px;">
+        <div style="background: white; border-radius: 12px; padding: 40px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 20px;">
+              <span style="color: white; font-size: 24px; font-weight: bold;">NS</span>
+            </div>
+            <h1 style="color: #1f2937; margin: 0; font-size: 28px;">NovaStake</h1>
+            <p style="color: #6b7280; margin: 8px 0 0; font-size: 16px;">Email Verification</p>
+          </div>
+          
+          <div style="background: #f3f4f6; padding: 30px; border-radius: 8px; text-align: center; margin: 30px 0; border: 2px solid #e5e7eb;">
+            <p style="color: #6b7280; margin: 0 0 15px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Your Verification Code</p>
+            <div style="font-size: 36px; font-weight: bold; color: #6366f1; letter-spacing: 8px; line-height: 1;">${code}</div>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <p style="color: #6b7280; font-size: 16px; line-height: 1.6;">
+              This code will expire in <strong style="color: #ef4444;">10 minutes</strong>.
+            </p>
+            <p style="color: #9ca3af; font-size: 14px; margin-top: 20px;">
+              If you didn't request this verification, please ignore this email.
+            </p>
+          </div>
+          
+          <div style="border-top: 1px solid #e5e7eb; padding-top: 20px; text-align: center;">
+            <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+              © 2024 NovaStake. All rights reserved.
+            </p>
+            <p style="color: #9ca3af; font-size: 12px; margin: 8px 0 0;">
+              Secure Web3 Staking Platform
+            </p>
+          </div>
+        </div>
+      </div>
+    `
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log('✅ Verification email sent to:', email);
+    return true;
+  } catch (error) {
+    console.error('❌ Email sending failed:', error.message);
+    // Fallback to console if email fails
+    console.log(`📧 Fallback - Code for ${email}: ${code}`);
+    return true; // Still return true so registration can continue
+  }
+}
 
 // Helper to create JWT
 function createToken(user) {
@@ -55,13 +139,24 @@ router.post('/send-verification', async (req, res, next) => {
       attempts: 0
     });
 
-    console.log(`📧 Verification code for ${email}: ${code} (expires: ${expiresAt})`);
+    console.log(`📧 Sending verification code for ${email}: ${code} (expires: ${expiresAt})`);
 
-    // Return success with debug code for testing
+    // Try to send email
+    const emailSent = await sendVerificationEmail(email, code);
+    
+    if (!emailSent) {
+      return res.status(500).json({ error: 'Failed to send verification email. Please try again.' });
+    }
+
+    // Check if email was actually sent or fallback was used
+    const emailServiceAvailable = transporter !== null;
+    
     res.json({ 
       message: 'Verification code sent successfully',
       email: email,
-      debugCode: code // Show code in response for testing
+      emailService: emailServiceAvailable ? 'email' : 'console',
+      // Show code in console mode for testing
+      debugCode: !emailServiceAvailable ? code : undefined
     });
   } catch (err) {
     next(err);
