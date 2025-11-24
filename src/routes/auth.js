@@ -23,7 +23,17 @@ try {
         pass: process.env.EMAIL_PASS
       }
     });
-    console.log('✅ Email service initialized');
+    
+    // Verify email service connection
+    transporter.verify(function (error, success) {
+      if (error) {
+        console.log('❌ Email service verification failed:', error.message);
+        console.log('⚠️ Falling back to console mode');
+        transporter = null; // Disable email service
+      } else {
+        console.log("✅ Email service is ready to send messages");
+      }
+    });
   } else {
     console.log('⚠️ Email credentials not found, using console fallback');
   }
@@ -92,6 +102,47 @@ async function sendVerificationEmail(email, code) {
     return true; // Still return true so registration can continue
   }
 }
+
+// Test email service endpoint
+router.get('/test-email', async (req, res) => {
+  try {
+    if (!transporter) {
+      return res.json({ 
+        status: 'unavailable',
+        message: 'Email service not configured or failed verification',
+        mode: 'console fallback'
+      });
+    }
+
+    // Test with a verification email
+    const testCode = '123456';
+    const testEmail = 'test@example.com';
+    
+    const emailSent = await sendVerificationEmail(testEmail, testCode);
+    
+    if (emailSent) {
+      res.json({ 
+        status: 'success',
+        message: 'Email service is working',
+        mode: 'email service',
+        testEmail: testEmail,
+        testCode: testCode
+      });
+    } else {
+      res.json({ 
+        status: 'failed',
+        message: 'Email service verification failed',
+        mode: 'console fallback'
+      });
+    }
+  } catch (error) {
+    res.status(500).json({ 
+      status: 'error',
+      message: error.message,
+      mode: 'console fallback'
+    });
+  }
+});
 
 // Helper to create JWT
 function createToken(user) {
