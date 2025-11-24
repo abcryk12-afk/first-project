@@ -1,7 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
 const { users, wallets } = require('../data/store');
 const { JWT_SECRET } = require('../middleware/auth');
 
@@ -10,36 +10,45 @@ const router = express.Router();
 // Email verification storage (in-memory for now)
 const verificationCodes = new Map();
 
-// Initialize Resend with API key
-const resendApiKey = process.env.RESEND_API_KEY;
-let resend = null;
+// Initialize Gmail SMTP transporter
+const gmailEmail = process.env.GMAIL_EMAIL || 'wanum01234@gmail.com';
+const gmailPassword = process.env.GMAIL_PASSWORD || 'yocbixqhzciwvkfx';
 
-if (resendApiKey) {
+let transporter = null;
+
+if (gmailEmail && gmailPassword) {
   try {
-    resend = new Resend(resendApiKey);
-    console.log(' Resend email service initialized');
-    console.log(' API Key found:', resendApiKey.substring(0, 10) + '...');
+    transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: gmailEmail,
+        pass: gmailPassword
+      }
+    });
+    
+    console.log(' Gmail SMTP service initialized');
+    console.log(' API Key found:', gmailEmail.substring(0, 5) + '***@gmail.com');
   } catch (error) {
-    console.log(' Resend initialization failed:', error.message);
+    console.log(' Gmail initialization failed:', error.message);
     console.log(' Using console fallback');
   }
 } else {
-  console.log(' RESEND_API_KEY not found in environment variables');
+  console.log(' GMAIL_EMAIL or GMAIL_PASSWORD not found in environment variables');
   console.log(' Using console fallback mode');
 }
 
 // Send verification email function
 async function sendVerificationEmail(email, code) {
-  // If Resend is not available, fallback to console
-  if (!resend) {
-    console.log(` Console fallback - Verification code for ${email}: ${code}`);
+  // If Gmail SMTP is not available, fallback to console
+  if (!transporter) {
+    console.log(`📧 Console fallback - Verification code for ${email}: ${code}`);
     return { success: true, mode: 'console' };
   }
 
   try {
-    const { data, error } = await resend.emails.send({
-      from: 'NovaStake <onboarding@resend.dev>',
-      to: [email],
+    const mailOptions = {
+      from: `"NovaStake" <${gmailEmail}>`,
+      to: email,
       subject: 'NovaStake - Email Verification Code',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f8f9fa; padding: 40px 20px;">
@@ -62,13 +71,13 @@ async function sendVerificationEmail(email, code) {
                 This code will expire in <strong style="color: #ef4444;">10 minutes</strong>.
               </p>
               <p style="color: #9ca3af; font-size: 14px; margin-top: 20px;">
-                If you didn')t request this verification, please ignore this email.
+                If you didn't request this verification, please ignore this email.
               </p>
             </div>
             
             <div style="border-top: 1px solid #e5e7eb; padding-top: 20px; text-align: center;">
               <p style="color: #9ca3af; font-size: 12px; margin: 0;">
-                 2024 NovaStake. All rights reserved.
+                © 2024 NovaStake. All rights reserved.
               </p>
               <p style="color: #9ca3af; font-size: 12px; margin: 8px 0 0;">
                 Secure Web3 Staking Platform
@@ -77,20 +86,17 @@ async function sendVerificationEmail(email, code) {
           </div>
         </div>
       `
-    });
+    };
 
-    if (error) {
-      console.error(' Resend email sending failed:', error);
-      console.log(` Email failed - Console fallback for ${email}: ${code}`);
-      return { success: true, mode: 'console', error: error.message };
-    }
-
-    console.log(' Verification email sent to:', email);
-    console.log(' Email ID:', data.id);
-    return { success: true, mode: 'Resend', emailId: data.id };
+    const result = await transporter.sendMail(mailOptions);
+    
+    console.log('✅ Verification email sent to:', email);
+    console.log('📧 Message ID:', result.messageId);
+    return { success: true, mode: 'Gmail SMTP', messageId: result.messageId };
+    
   } catch (error) {
-    console.error(' Email sending failed:', error.message);
-    console.log(` Email failed - Console fallback for ${email}: ${code}`);
+    console.error('❌ Gmail email sending failed:', error);
+    console.log(`📧 Email failed - Console fallback for ${email}: ${code}`);
     return { success: true, mode: 'console', error: error.message };
   }
 }
@@ -112,13 +118,13 @@ function generateVerificationCode() {
 // Test email service endpoint
 router.get('/test-email', async (req, res) => {
   try {
-    if (!resend) {
+    if (!transporter) {
       return res.json({ 
         status: 'unavailable',
-        message: 'Resend service not configured - API key missing',
+        message: 'Gmail SMTP service not configured - credentials missing',
         mode: 'console fallback',
-        apiKeyFound: !!resendApiKey,
-        apiKeyPrefix: resendApiKey ? resendApiKey.substring(0, 10) + '...' : 'none'
+        emailFound: !!gmailEmail,
+        emailPrefix: gmailEmail ? gmailEmail.substring(0, 5) + '***@gmail.com' : 'none'
       });
     }
 
@@ -130,16 +136,16 @@ router.get('/test-email', async (req, res) => {
     if (result.success) {
       res.json({ 
         status: 'success',
-        message: 'Resend email service is working',
+        message: 'Gmail SMTP email service is working',
         mode: result.mode,
         testEmail: testEmail,
         testCode: testCode,
-        emailId: result.emailId
+        messageId: result.messageId
       });
     } else {
       res.json({ 
         status: 'failed',
-        message: 'Resend email service verification failed',
+        message: 'Gmail SMTP email service verification failed',
         mode: result.mode
       });
     }
@@ -332,6 +338,52 @@ router.post('/login', async (req, res, next) => {
     });
   } catch (err) {
     next(err);
+  }
+});
+
+// Webhook endpoint for Resend email events
+router.post('/webhook', async (req, res) => {
+  try {
+    const event = req.body;
+    
+    console.log('📧 Resend webhook received:', {
+      type: event.type,
+      created_at: event.created_at,
+      data: event.data
+    });
+    
+    // Handle different webhook events
+    switch (event.type) {
+      case 'email.delivered':
+        console.log('✅ Email delivered:', event.data.email_id);
+        break;
+        
+      case 'email.complained':
+        console.log('⚠️ Email complained:', event.data.email_id);
+        break;
+        
+      case 'email.bounced':
+        console.log('❌ Email bounced:', event.data.email_id);
+        break;
+        
+      case 'email.opened':
+        console.log('👁️ Email opened:', event.data.email_id);
+        break;
+        
+      case 'email.clicked':
+        console.log('🖱️ Email clicked:', event.data.email_id);
+        break;
+        
+      default:
+        console.log('📋 Unknown webhook event:', event.type);
+    }
+    
+    // Always return 200 OK to Resend
+    res.status(200).json({ received: true });
+    
+  } catch (error) {
+    console.error('❌ Webhook processing failed:', error);
+    res.status(200).json({ received: true }); // Still return 200 to avoid retries
   }
 });
 
