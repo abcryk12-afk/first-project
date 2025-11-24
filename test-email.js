@@ -2,11 +2,13 @@ const nodemailer = require('nodemailer');
 
 // Enhanced Gmail SMTP configuration
 const gmailEmail = process.env.EMAIL_USER || 'wanum01234@gmail.com';
-const gmailPassword = process.env.EMAIL_PASS || 'nacd mkgx ynhv rwqe';
+const gmailPassword = process.env.EMAIL_PASS || 'nacdmkgxynhvrwqe';
 
 // Create a transporter object with enhanced settings
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true, // true for 465 (SSL), false for other ports
   auth: {
     user: gmailEmail, // Your full Gmail address
     pass: gmailPassword, // The 16-character app password
