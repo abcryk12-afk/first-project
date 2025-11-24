@@ -1,7 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-let nodemailer = null;
+let Resend = null;
 const { users, wallets } = require('../data/store');
 const { JWT_SECRET } = require('../middleware/auth');
 
@@ -10,90 +10,81 @@ const router = express.Router();
 // Email verification storage (in-memory for now)
 const verificationCodes = new Map();
 
-// Initialize nodemailer only if credentials are available
+// Initialize Resend only if API key is available
 try {
-  nodemailer = require('nodemailer');
+  Resend = require('resend');
   
-  // Create transporter only if we have valid credentials
-  if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-    var transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-      }
-    });
-    
-    // Verify email service connection
-    transporter.verify(function (error, success) {
-      if (error) {
-        console.log('❌ Email service verification failed:', error.message);
-        console.log('⚠️ Falling back to console mode');
-        transporter = null; // Disable email service
-      } else {
-        console.log("✅ Email service is ready to send messages");
-      }
-    });
+  // Create Resend instance only if we have valid API key
+  if (process.env.RESEND_API_KEY) {
+    var resend = new Resend(process.env.RESEND_API_KEY);
+    console.log('✅ Resend email service initialized');
   } else {
-    console.log('⚠️ Email credentials not found, using console fallback');
+    console.log('⚠️ Resend API key not found, using console fallback');
   }
 } catch (error) {
-  console.log('⚠️ Nodemailer not available, using console fallback');
+  console.log('⚠️ Resend not available, using console fallback');
 }
 
 // Send verification email function
 async function sendVerificationEmail(email, code) {
-  // If email service is not available, return success (fallback)
-  if (!transporter) {
-    console.log(`📧 Email service unavailable - Code for ${email}: ${code}`);
+  // If Resend is not available, return success (fallback)
+  if (!resend) {
+    console.log(`📧 Resend service unavailable - Code for ${email}: ${code}`);
     return true;
   }
 
-  const mailOptions = {
-    from: 'NovaStake <wanum01234@gmail.com>',
-    to: email,
-    subject: 'NovaStake - Email Verification Code',
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f8f9fa; padding: 40px 20px;">
-        <div style="background: white; border-radius: 12px; padding: 40px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-          <div style="text-align: center; margin-bottom: 30px;">
-            <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 20px;">
-              <span style="color: white; font-size: 24px; font-weight: bold;">NS</span>
+  try {
+    const { data, error } = await resend.emails.send({
+      from: 'NovaStake <onboarding@resend.dev>',
+      to: [email],
+      subject: 'NovaStake - Email Verification Code',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f8f9fa; padding: 40px 20px;">
+          <div style="background: white; border-radius: 12px; padding: 40px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 20px;">
+                <span style="color: white; font-size: 24px; font-weight: bold;">NS</span>
+              </div>
+              <h1 style="color: #1f2937; margin: 0; font-size: 28px;">NovaStake</h1>
+              <p style="color: #6b7280; margin: 8px 0 0; font-size: 16px;">Email Verification</p>
             </div>
-            <h1 style="color: #1f2937; margin: 0; font-size: 28px;">NovaStake</h1>
-            <p style="color: #6b7280; margin: 8px 0 0; font-size: 16px;">Email Verification</p>
-          </div>
-          
-          <div style="background: #f3f4f6; padding: 30px; border-radius: 8px; text-align: center; margin: 30px 0; border: 2px solid #e5e7eb;">
-            <p style="color: #6b7280; margin: 0 0 15px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Your Verification Code</p>
-            <div style="font-size: 36px; font-weight: bold; color: #6366f1; letter-spacing: 8px; line-height: 1;">${code}</div>
-          </div>
-          
-          <div style="text-align: center; margin: 30px 0;">
-            <p style="color: #6b7280; font-size: 16px; line-height: 1.6;">
-              This code will expire in <strong style="color: #ef4444;">10 minutes</strong>.
-            </p>
-            <p style="color: #9ca3af; font-size: 14px; margin-top: 20px;">
-              If you didn't request this verification, please ignore this email.
-            </p>
-          </div>
-          
-          <div style="border-top: 1px solid #e5e7eb; padding-top: 20px; text-align: center;">
-            <p style="color: #9ca3af; font-size: 12px; margin: 0;">
-              © 2024 NovaStake. All rights reserved.
-            </p>
-            <p style="color: #9ca3af; font-size: 12px; margin: 8px 0 0;">
-              Secure Web3 Staking Platform
-            </p>
+            
+            <div style="background: #f3f4f6; padding: 30px; border-radius: 8px; text-align: center; margin: 30px 0; border: 2px solid #e5e7eb;">
+              <p style="color: #6b7280; margin: 0 0 15px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Your Verification Code</p>
+              <div style="font-size: 36px; font-weight: bold; color: #6366f1; letter-spacing: 8px; line-height: 1;">${code}</div>
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <p style="color: #6b7280; font-size: 16px; line-height: 1.6;">
+                This code will expire in <strong style="color: #ef4444;">10 minutes</strong>.
+              </p>
+              <p style="color: #9ca3af; font-size: 14px; margin-top: 20px;">
+                If you didn't request this verification, please ignore this email.
+              </p>
+            </div>
+            
+            <div style="border-top: 1px solid #e5e7eb; padding-top: 20px; text-align: center;">
+              <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+                © 2024 NovaStake. All rights reserved.
+              </p>
+              <p style="color: #9ca3af; font-size: 12px; margin: 8px 0 0;">
+                Secure Web3 Staking Platform
+              </p>
+            </div>
           </div>
         </div>
-      </div>
-    `
-  };
+      `
+    });
 
-  try {
-    await transporter.sendMail(mailOptions);
+    if (error) {
+      console.error('❌ Resend email sending failed:', error);
+      // Fallback to console if email fails
+      console.log(`📧 Fallback - Code for ${email}: ${code}`);
+      return true; // Still return true so registration can continue
+    }
+
     console.log('✅ Verification email sent to:', email);
+    console.log('📧 Email ID:', data.id);
     return true;
   } catch (error) {
     console.error('❌ Email sending failed:', error.message);
@@ -106,10 +97,10 @@ async function sendVerificationEmail(email, code) {
 // Test email service endpoint
 router.get('/test-email', async (req, res) => {
   try {
-    if (!transporter) {
+    if (!resend) {
       return res.json({ 
         status: 'unavailable',
-        message: 'Email service not configured or failed verification',
+        message: 'Resend service not configured or API key missing',
         mode: 'console fallback'
       });
     }
@@ -123,15 +114,15 @@ router.get('/test-email', async (req, res) => {
     if (emailSent) {
       res.json({ 
         status: 'success',
-        message: 'Email service is working',
-        mode: 'email service',
+        message: 'Resend email service is working',
+        mode: 'Resend service',
         testEmail: testEmail,
         testCode: testCode
       });
     } else {
       res.json({ 
         status: 'failed',
-        message: 'Email service verification failed',
+        message: 'Resend email service verification failed',
         mode: 'console fallback'
       });
     }
@@ -200,14 +191,14 @@ router.post('/send-verification', async (req, res, next) => {
     }
 
     // Check if email was actually sent or fallback was used
-    const emailServiceAvailable = transporter !== null;
+    const resendServiceAvailable = resend !== null;
     
     res.json({ 
       message: 'Verification code sent successfully',
       email: email,
-      emailService: emailServiceAvailable ? 'email' : 'console',
+      emailService: resendServiceAvailable ? 'Resend' : 'console',
       // Show code in console mode for testing
-      debugCode: !emailServiceAvailable ? code : undefined
+      debugCode: !resendServiceAvailable ? code : undefined
     });
   } catch (err) {
     next(err);
