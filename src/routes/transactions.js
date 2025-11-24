@@ -7,7 +7,6 @@ const router = express.Router();
 router.get('/', authRequired, (req, res) => {
   const userTransactions = transactions.filter((t) => t.userId === req.user.id);
   
-  // Support pagination
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 50;
   const startIndex = (page - 1) * limit;

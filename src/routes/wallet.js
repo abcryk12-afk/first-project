@@ -47,7 +47,6 @@ router.get('/dashboard-summary', authRequired, (req, res) => {
     return res.status(404).json({ error: 'Wallet not found' });
   }
   
-  // Calculate rewards estimates
   const totalStaked = wallet.stakedBalance;
   const dailyRewardsEstimate = (totalStaked * APR) / 365;
   const monthlyRewardsEstimate = dailyRewardsEstimate * 30;

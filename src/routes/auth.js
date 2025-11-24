@@ -299,30 +299,26 @@ router.post('/login', async (req, res, next) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({ error: 'Invalid email format' });
     }
 
-    // Find user
     const user = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
     
     if (!user) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    // Check password
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     
     if (!isPasswordValid) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    // Create token
     const token = createToken(user);
 
-    console.log(`✅ User logged in: ${email}`);
+    console.log(` User logged in: ${email}`);
 
     res.json({
       message: 'Login successful',
