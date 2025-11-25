@@ -459,7 +459,7 @@ router.delete('/users/:id', adminAuth, async (req, res) => {
   }
 });
 
-// Get verification codes from auth module
+// Get verification codes from store module
 const { verificationCodes } = require('../data/store');
 
 // Admin route to get all verification codes

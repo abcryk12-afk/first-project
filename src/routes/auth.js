@@ -1,13 +1,10 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { users, wallets } = require('../data/store');
+const { users, wallets, verificationCodes } = require('../data/store');
 const { JWT_SECRET } = require('../middleware/auth');
 
 const router = express.Router();
-
-// Email verification storage (in-memory for now)
-const verificationCodes = new Map();
 
 // Console-based verification code system
 function generateVerificationCode() {
