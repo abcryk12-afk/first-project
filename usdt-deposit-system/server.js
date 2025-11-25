@@ -29,6 +29,22 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Root route for Render
+app.get('/', (req, res) => {
+  res.json({ 
+    message: '🚀 NexChain USDT Deposit System API',
+    status: 'Running',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      health: '/health',
+      wallet: '/api/wallet/balance',
+      stakes: '/api/stake',
+      admin: '/api/admin',
+      frontend: '/stake'
+    }
+  });
+});
+
 // Routes
 app.use('/api/user', userRoutes);
 app.use('/api/deposit', depositRoutes);
@@ -197,10 +213,14 @@ async function startServices() {
 
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🌐 Local: http://localhost:${PORT}`);
-  console.log(`🌐 Network: http://0.0.0.0:${PORT}`);
-  startServices();
+  console.log(`🚀 NexChain Server running on port ${PORT}`);
+  console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🌐 URL: http://0.0.0.0:${PORT}`);
+  
+  // Only start services if not in test mode
+  if (process.env.NODE_ENV !== 'test') {
+    startServices();
+  }
 });
 
 // Graceful shutdown
@@ -213,11 +233,7 @@ process.on('SIGTERM', () => {
 // Serve static files
 app.use(express.static('public'));
 
-// Frontend routes
-app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/public/stake.html');
-});
-
+// Frontend routes (API routes first)
 app.get('/stake', (req, res) => {
   res.sendFile(__dirname + '/public/stake.html');
 });
