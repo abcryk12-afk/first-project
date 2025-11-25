@@ -1,7 +1,6 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const nodemailer = require('nodemailer');
 const { users, wallets } = require('../data/store');
 const { JWT_SECRET } = require('../middleware/auth');
 
@@ -10,133 +9,28 @@ const router = express.Router();
 // Email verification storage (in-memory for now)
 const verificationCodes = new Map();
 
-// Initialize Gmail SMTP transporter
-const gmailEmail = process.env.EMAIL_USER || 'wanum01234@gmail.com';
-const gmailPassword = process.env.EMAIL_PASS || 'nacdmkgxynhvrwqe';
-
-let transporter = null;
-
-if (gmailEmail && gmailPassword) {
-  try {
-    transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true, // true for 465 (SSL), false for other ports
-      auth: {
-        user: gmailEmail,
-        pass: gmailPassword
-      },
-      pool: true,
-      maxConnections: 1,
-      maxMessages: 5,
-      rateDelta: 1000,
-      rateLimit: 5,
-      connectionTimeout: 60000, // 60 seconds
-      greetingTimeout: 30000,   // 30 seconds
-      socketTimeout: 60000      // 60 seconds
-    });
-    
-    console.log(' Gmail SMTP service initialized');
-    console.log(' API Key found:', gmailEmail.substring(0, 5) + '***@gmail.com');
-  } catch (error) {
-    console.log(' Gmail initialization failed:', error.message);
-    console.log(' Using console fallback');
-  }
-} else {
-  console.log(' GMAIL_EMAIL or GMAIL_PASSWORD not found in environment variables');
-  console.log(' Using console fallback mode');
+// Console-based verification code system
+function generateVerificationCode() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-// Send verification email function
+// Send verification code to console
 async function sendVerificationEmail(email, code) {
-  // If Gmail SMTP is not available, fallback to console
-  if (!transporter) {
-    console.log(`📧 Console fallback - Verification code for ${email}: ${code}`);
-    return { success: true, mode: 'console' };
-  }
-
-  const mailOptions = {
-    from: `"NovaStake" <${gmailEmail}>`,
-    to: email,
-    subject: 'NovaStake - Email Verification Code',
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f8f9fa; padding: 40px 20px;">
-        <div style="background: white; border-radius: 12px; padding: 40px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-          <div style="text-align: center; margin-bottom: 30px;">
-            <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 20px;">
-              <span style="color: white; font-size: 24px; font-weight: bold;">NS</span>
-            </div>
-            <h1 style="color: #1f2937; margin: 0; font-size: 28px;">NovaStake</h1>
-            <p style="color: #6b7280; margin: 8px 0 0; font-size: 16px;">Email Verification</p>
-          </div>
-          
-          <div style="background: #f3f4f6; padding: 30px; border-radius: 8px; text-align: center; margin: 30px 0; border: 2px solid #e5e7eb;">
-            <p style="color: #6b7280; margin: 0 0 15px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Your Verification Code</p>
-            <div style="font-size: 36px; font-weight: bold; color: #6366f1; letter-spacing: 8px; line-height: 1;">${code}</div>
-          </div>
-          
-          <div style="text-align: center; margin: 30px 0;">
-            <p style="color: #6b7280; font-size: 16px; line-height: 1.6;">
-              This code will expire in <strong style="color: #ef4444;">10 minutes</strong>.
-            </p>
-            <p style="color: #9ca3af; font-size: 14px; margin-top: 20px;">
-              If you didn't request this verification, please ignore this email.
-            </p>
-          </div>
-          
-          <div style="border-top: 1px solid #e5e7eb; padding-top: 20px; text-align: center;">
-            <p style="color: #9ca3af; font-size: 12px; margin: 0;">
-              © 2024 NovaStake. All rights reserved.
-            </p>
-            <p style="color: #9ca3af; font-size: 12px; margin: 8px 0 0;">
-              Secure Web3 Staking Platform
-            </p>
-          </div>
-        </div>
-      </div>
-    `
-  };
-
-  const maxRetries = 3;
-  let lastError;
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      console.log(`📧 Gmail Attempt ${attempt}/${maxRetries}: Sending to ${email}`);
-      
-      const result = await transporter.sendMail(mailOptions);
-      
-      console.log('✅ Gmail verification email sent successfully to:', email);
-      console.log('📧 Message ID:', result.messageId);
-      
-      return { 
-        success: true, 
-        mode: 'Gmail SMTP', 
-        messageId: result.messageId 
-      };
-      
-    } catch (error) {
-      lastError = error;
-      console.error(`❌ Gmail Attempt ${attempt} failed:`, error.message);
-      
-      // If it's the last attempt, don't wait
-      if (attempt < maxRetries) {
-        // Wait before retry (exponential backoff)
-        const waitTime = Math.pow(2, attempt - 1) * 1000; // 1s, 2s, 4s
-        console.log(`⏳ Gmail waiting ${waitTime}ms before retry...`);
-        await new Promise(resolve => setTimeout(resolve, waitTime));
-      }
-    }
-  }
-
-  console.error('❌ All Gmail attempts failed - Using console fallback');
-  console.log(`📧 Console fallback for ${email}: ${code}`);
+  console.log('='.repeat(60));
+  console.log('🔐 EMAIL VERIFICATION CODE');
+  console.log('='.repeat(60));
+  console.log(`📧 Email: ${email}`);
+  console.log(`🔢 Code: ${code}`);
+  console.log(`⏰ Expires in: 10 minutes`);
+  console.log('='.repeat(60));
+  console.log('📋 Copy this code and use it in the registration form');
+  console.log('='.repeat(60));
   
   return { 
     success: true, 
-    mode: 'console', 
-    error: lastError.message,
-    gmailError: true
+    mode: 'console',
+    debugCode: code,
+    message: 'Verification code sent to console'
   };
 }
 
@@ -405,7 +299,7 @@ function getNextSteps(finalStatus) {
 // Send verification code
 router.post('/send-verification', async (req, res, next) => {
   try {
-    const { email } = req.body;
+    const { email, name } = req.body;
     
     if (!email) {
       return res.status(400).json({ error: 'Email is required' });
@@ -427,7 +321,9 @@ router.post('/send-verification', async (req, res, next) => {
     verificationCodes.set(email.toLowerCase(), {
       code,
       expiresAt,
-      attempts: 0
+      attempts: 0,
+      name: name || 'Pending User',
+      createdAt: new Date().toISOString()
     });
 
     console.log(` Sending verification code for ${email}: ${code} (expires: ${expiresAt})`);
@@ -436,25 +332,22 @@ router.post('/send-verification', async (req, res, next) => {
     
     if (!emailResult.success) {
       return res.status(500).json({ 
-        error: 'Failed to send verification email. Please try again.', 
-        gmailError: emailResult.gmailError || false,
-        errorDetails: emailResult.error || null
+        error: 'Failed to send verification email. Please try again.'
       });
     }
 
     res.json({ 
       message: 'Verification code sent successfully',
       email: email,
-      emailService: emailResult.mode,
-      messageId: emailResult.messageId,
-      debugCode: emailResult.mode === 'console' ? code : undefined,
-      gmailError: emailResult.gmailError || false,
-      error: emailResult.error || null
+      emailService: 'console',
+      debugCode: code,
+      consoleMessage: 'Check server console for verification code'
     });
   } catch (err) {
     next(err);
   }
 });
+
 router.post('/verify-email', async (req, res, next) => {
   try {
     const { email, code, name, password } = req.body;
@@ -632,6 +525,56 @@ router.post('/webhook', async (req, res) => {
   } catch (error) {
     console.error('❌ Webhook processing failed:', error);
     res.status(200).json({ received: true }); // Still return 200 to avoid retries
+  }
+});
+
+// Admin route to get all verification codes
+router.get('/admin/verification-codes', (req, res) => {
+  try {
+    const codes = [];
+    
+    // Convert verificationCodes Map to array with additional info
+    verificationCodes.forEach((data, email) => {
+      const now = new Date();
+      const expiresAt = new Date(data.expiresAt);
+      const isExpired = now > expiresAt;
+      
+      codes.push({
+        id: codes.length + 1,
+        name: data.name || 'Pending User',
+        email: email,
+        code: data.code,
+        expires_at: data.expiresAt,
+        created_at: data.createdAt || new Date(now - (10 * 60 * 1000)).toISOString(),
+        status: isExpired ? 'expired' : 'pending'
+      });
+    });
+    
+    console.log(`📋 Admin requested verification codes: ${codes.length} found`);
+    res.json({ codes });
+    
+  } catch (error) {
+    console.error('❌ Error getting verification codes:', error);
+    res.status(500).json({ error: 'Failed to get verification codes' });
+  }
+});
+
+// Admin route to delete verification code
+router.delete('/admin/verification-codes/:email', (req, res) => {
+  try {
+    const { email } = req.params;
+    
+    if (verificationCodes.has(email)) {
+      verificationCodes.delete(email);
+      console.log(`🗑️ Admin deleted verification code for: ${email}`);
+      res.json({ message: 'Verification code deleted successfully' });
+    } else {
+      res.status(404).json({ error: 'Verification code not found' });
+    }
+    
+  } catch (error) {
+    console.error('❌ Error deleting verification code:', error);
+    res.status(500).json({ error: 'Failed to delete verification code' });
   }
 });
 

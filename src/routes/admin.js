@@ -26,6 +26,24 @@ function adminAuth(req, res, next) {
   }
 }
 
+// Admin validation route
+router.post('/validate', adminAuth, async (req, res) => {
+  try {
+    console.log('🔍 Admin token validation request');
+    
+    // If we reach here, adminAuth middleware already validated the token
+    res.json({ 
+      valid: true, 
+      message: 'Admin token is valid',
+      admin: req.admin 
+    });
+    
+  } catch (error) {
+    console.error('❌ Admin validation error:', error);
+    res.status(500).json({ message: 'Admin validation failed' });
+  }
+});
+
 // Admin login
 router.post('/login', async (req, res) => {
   try {
