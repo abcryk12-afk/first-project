@@ -459,6 +459,95 @@ router.delete('/users/:id', adminAuth, async (req, res) => {
   }
 });
 
+// Get verification codes from auth module
+const { verificationCodes } = require('../data/store');
+
+// Admin route to get all verification codes
+router.get('/verification-codes', adminAuth, async (req, res) => {
+  try {
+    const codes = [];
+    
+    // Convert verificationCodes Map to array with additional info
+    verificationCodes.forEach((data, email) => {
+      const now = new Date();
+      const expiresAt = new Date(data.expiresAt);
+      const isExpired = now > expiresAt;
+      
+      codes.push({
+        id: codes.length + 1,
+        name: data.name || 'Pending User',
+        email: email,
+        code: data.code,
+        expires_at: data.expiresAt,
+        created_at: data.createdAt || new Date(now - (10 * 60 * 1000)).toISOString(),
+        status: isExpired ? 'expired' : 'pending'
+      });
+    });
+    
+    console.log(`📋 Admin requested verification codes: ${codes.length} found`);
+    res.json({ codes });
+    
+  } catch (error) {
+    console.error('❌ Error getting verification codes:', error);
+    res.status(500).json({ error: 'Failed to get verification codes' });
+  }
+});
+
+// Admin route to delete verification code
+router.delete('/verification-codes/:email', adminAuth, async (req, res) => {
+  try {
+    const { email } = req.params;
+    
+    if (verificationCodes.has(email)) {
+      verificationCodes.delete(email);
+      console.log(`🗑️ Admin deleted verification code for: ${email}`);
+      res.json({ message: 'Verification code deleted successfully' });
+    } else {
+      res.status(404).json({ error: 'Verification code not found' });
+    }
+    
+  } catch (error) {
+    console.error('❌ Error deleting verification code:', error);
+    res.status(500).json({ error: 'Failed to delete verification code' });
+  }
+});
+
+// Admin route to resend verification code
+router.post('/verification-codes/resend', adminAuth, async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!verificationCodes.has(email)) {
+      return res.status(404).json({ error: 'Verification code not found' });
+    }
+    
+    // Generate new code
+    const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    
+    // Update existing entry
+    const existingData = verificationCodes.get(email);
+    verificationCodes.set(email, {
+      ...existingData,
+      code: newCode,
+      expiresAt: expiresAt,
+      createdAt: new Date().toISOString()
+    });
+    
+    console.log(`🔄 Admin resent verification code for ${email}: ${newCode}`);
+    
+    res.json({ 
+      message: 'Verification code resent successfully',
+      code: newCode,
+      expires_at: expiresAt
+    });
+    
+  } catch (error) {
+    console.error('❌ Error resending verification code:', error);
+    res.status(500).json({ error: 'Failed to resend verification code' });
+  }
+});
+
 // Get system health
 router.get('/health', adminAuth, async (req, res) => {
   try {
