@@ -578,4 +578,134 @@ router.get('/health', adminAuth, async (req, res) => {
   }
 });
 
+// Get all deposits (new user deposits)
+router.get('/deposits', adminAuth, async (req, res) => {
+  try {
+    console.log('📊 Admin requesting deposits data...');
+    
+    // For now, return sample data. In production, this would come from a database
+    const deposits = [
+      {
+        id: 1,
+        user_name: 'Ahmed Khan',
+        user_email: 'ahmed@example.com',
+        amount: 1000.00,
+        wallet_balance: 1250.75,
+        reward_bonus: 50.00,
+        referral: 'ref12345',
+        status: 'confirmed',
+        created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        id: 2,
+        user_name: 'Fatima Ali',
+        user_email: 'fatima@example.com',
+        amount: 500.00,
+        wallet_balance: 550.00,
+        reward_bonus: 25.00,
+        referral: 'ref67890',
+        status: 'pending',
+        created_at: new Date(Date.now() - 30 * 60 * 1000).toISOString()
+      },
+      {
+        id: 3,
+        user_name: 'Muhammad Hassan',
+        user_email: 'hassan@example.com',
+        amount: 2500.00,
+        wallet_balance: 2750.00,
+        reward_bonus: 125.00,
+        referral: null,
+        status: 'confirmed',
+        created_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        id: 4,
+        user_name: 'Sarah Johnson',
+        user_email: 'sarah@example.com',
+        amount: 750.00,
+        wallet_balance: 0.00,
+        reward_bonus: 0.00,
+        referral: 'ref11111',
+        status: 'failed',
+        created_at: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
+      }
+    ];
+    
+    console.log(`📊 Sent ${deposits.length} deposits to admin`);
+    res.json({ deposits });
+    
+  } catch (error) {
+    console.error('❌ Error getting deposits:', error);
+    res.status(500).json({ error: 'Failed to get deposits' });
+  }
+});
+
+// Get all withdrawal requests
+router.get('/withdrawal-requests', adminAuth, async (req, res) => {
+  try {
+    console.log('💰 Admin requesting withdrawal requests data...');
+    
+    // For now, return sample data. In production, this would come from a database
+    const withdrawalRequests = [
+      {
+        id: 1,
+        user_name: 'Ahmed Khan',
+        user_email: 'ahmed@example.com',
+        withdrawal_amount: 500.00,
+        wallet_balance: 1250.75,
+        wallet_address: '0x1234...5678',
+        status: 'pending',
+        created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        id: 2,
+        user_name: 'Fatima Ali',
+        user_email: 'fatima@example.com',
+        withdrawal_amount: 200.00,
+        wallet_balance: 550.00,
+        wallet_address: '0xabcd...efgh',
+        status: 'approved',
+        created_at: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        id: 3,
+        user_name: 'Muhammad Hassan',
+        user_email: 'hassan@example.com',
+        withdrawal_amount: 750.00,
+        wallet_balance: 2750.00,
+        wallet_address: '0x9876...5432',
+        status: 'rejected',
+        created_at: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        id: 4,
+        user_name: 'Sarah Johnson',
+        user_email: 'sarah@example.com',
+        withdrawal_amount: 150.00,
+        wallet_balance: 0.00,
+        wallet_address: '0xijkl...mnop',
+        status: 'pending',
+        created_at: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        id: 5,
+        user_name: 'Omar Farooq',
+        user_email: 'omar@example.com',
+        withdrawal_amount: 1000.00,
+        wallet_balance: 3500.00,
+        wallet_address: '0xqrst...uvwx',
+        status: 'approved',
+        created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+      }
+    ];
+    
+    console.log(`💰 Sent ${withdrawalRequests.length} withdrawal requests to admin`);
+    res.json({ withdrawalRequests });
+    
+  } catch (error) {
+    console.error('❌ Error getting withdrawal requests:', error);
+    res.status(500).json({ error: 'Failed to get withdrawal requests' });
+  }
+});
+
 module.exports = router;

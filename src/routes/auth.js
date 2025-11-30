@@ -1,6 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { sendVerificationEmail } = require('../../emailService');
 const { users, wallets, verificationCodes } = require('../data/store');
 const { JWT_SECRET } = require('../middleware/auth');
 
@@ -11,24 +12,55 @@ function generateVerificationCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-// Send verification code to console
-async function sendVerificationEmail(email, code) {
-  console.log('='.repeat(60));
-  console.log('🔐 EMAIL VERIFICATION CODE');
-  console.log('='.repeat(60));
-  console.log(`📧 Email: ${email}`);
-  console.log(`🔢 Code: ${code}`);
-  console.log(`⏰ Expires in: 10 minutes`);
-  console.log('='.repeat(60));
-  console.log('📋 Copy this code and use it in the registration form');
-  console.log('='.repeat(60));
-  
-  return { 
-    success: true, 
-    mode: 'console',
-    debugCode: code,
-    message: 'Verification code sent to console'
-  };
+// Send verification code to email
+async function sendVerificationEmailToUser(email, code, userName) {
+  try {
+    console.log('🔐 Sending verification email via NovaStake email service...');
+    const result = await sendVerificationEmail(email, code, userName);
+    
+    if (result.success) {
+      console.log('✅ Email sent successfully via NovaStake email service');
+      return result;
+    } else {
+      console.log('⚠️ Email service failed, falling back to console');
+      // Fallback to console if email fails
+      console.log('='.repeat(60));
+      console.log('🔐 EMAIL VERIFICATION CODE (FALLBACK)');
+      console.log('='.repeat(60));
+      console.log(`📧 Email: ${email}`);
+      console.log(`🔢 Code: ${code}`);
+      console.log(`⏰ Expires in: 10 minutes`);
+      console.log('='.repeat(60));
+      console.log('📋 Copy this code and use it in the registration form');
+      console.log('='.repeat(60));
+      
+      return { 
+        success: true, 
+        mode: 'console_fallback',
+        debugCode: code,
+        message: 'Verification code sent to console (email service failed)'
+      };
+    }
+  } catch (error) {
+    console.error('❌ Email service error:', error);
+    // Always fallback to console
+    console.log('='.repeat(60));
+    console.log('🔐 EMAIL VERIFICATION CODE (FALLBACK)');
+    console.log('='.repeat(60));
+    console.log(`📧 Email: ${email}`);
+    console.log(`🔢 Code: ${code}`);
+    console.log(`⏰ Expires in: 10 minutes`);
+    console.log('='.repeat(60));
+    console.log('📋 Copy this code and use it in the registration form');
+    console.log('='.repeat(60));
+    
+    return { 
+      success: true, 
+      mode: 'console_fallback',
+      debugCode: code,
+      message: 'Verification code sent to console (email service failed)'
+    };
+  }
 }
 
 // Helper to create JWT
@@ -296,10 +328,10 @@ function getNextSteps(finalStatus) {
 // Send verification code
 router.post('/send-verification', async (req, res, next) => {
   try {
-    const { email, name } = req.body;
+    const { email, code, userName } = req.body;
     
-    if (!email) {
-      return res.status(400).json({ error: 'Email is required' });
+    if (!email || !code || !userName) {
+      return res.status(400).json({ error: 'Email, code, and userName are required' });
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -312,20 +344,19 @@ router.post('/send-verification', async (req, res, next) => {
       return res.status(400).json({ error: 'User with this email already exists' });
     }
 
-    const code = generateVerificationCode();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
     
     verificationCodes.set(email.toLowerCase(), {
       code,
       expiresAt,
       attempts: 0,
-      name: name || 'Pending User',
+      name: userName,
       createdAt: new Date().toISOString()
     });
 
-    console.log(` Sending verification code for ${email}: ${code} (expires: ${expiresAt})`);
+    console.log(`📧 Sending verification code for ${email}: ${code} (expires: ${expiresAt})`);
 
-    const emailResult = await sendVerificationEmail(email, code);
+    const emailResult = await sendVerificationEmailToUser(email, code, userName);
     
     if (!emailResult.success) {
       return res.status(500).json({ 
@@ -334,13 +365,101 @@ router.post('/send-verification', async (req, res, next) => {
     }
 
     res.json({ 
+      success: true,
       message: 'Verification code sent successfully',
       email: email,
-      emailService: 'console',
-      debugCode: code,
-      consoleMessage: 'Check server console for verification code'
+      mode: emailResult.mode || 'email',
+      debugCode: emailResult.debugCode,
+      consoleMessage: emailResult.message
     });
   } catch (err) {
+    console.error('❌ Send verification error:', err);
+    next(err);
+  }
+});
+
+// Register user (after email verification)
+router.post('/register', async (req, res, next) => {
+  try {
+    const { name, email, password, wallet } = req.body;
+
+    if (!name || !email || !password || !wallet) {
+      return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+
+    if (name.length < 2) {
+      return res.status(400).json({ error: 'Name must be at least 2 characters long' });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters long' });
+    }
+
+    // Check if user already exists
+    const existing = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
+    if (existing) {
+      return res.status(400).json({ error: 'User with this email already exists' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const id = users.length + 1;
+    const user = {
+      id,
+      name,
+      email,
+      passwordHash,
+      walletAddress: wallet.address,
+      publicKey: wallet.publicKey,
+      privateKey: wallet.privateKey,
+      createdAt: new Date().toISOString(),
+      isVerified: true,
+      status: 'active'
+    };
+    users.push(user);
+
+    // Create wallet record
+    const userWallet = {
+      id,
+      userId: id,
+      name: user.name,
+      email: user.email,
+      walletAddress: wallet.address,
+      publicKey: wallet.publicKey,
+      privateKey: wallet.privateKey,
+      balance: wallet.balance || '0.00000000',
+      network: wallet.network || 'ETH',
+      walletType: wallet.walletType || 'ETH',
+      stakedBalance: 0.0,
+      rewardBalance: 0.0,
+      updatedAt: new Date().toISOString(),
+    };
+    wallets.push(userWallet);
+
+    const token = createToken(user);
+
+    console.log(`✅ User registered: ${email} with ID: ${id}`);
+    console.log(`🔐 Wallet created: ${wallet.address}`);
+
+    res.status(201).json({
+      success: true,
+      message: 'Registration successful',
+      user: { 
+        id: user.id, 
+        name: user.name, 
+        email: user.email,
+        walletAddress: user.walletAddress,
+        isVerified: user.isVerified,
+        status: user.status
+      },
+      token,
+    });
+  } catch (err) {
+    console.error('❌ Registration error:', err);
     next(err);
   }
 });

@@ -17,7 +17,10 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'NovaStake backend' });
 });
 
+// Direct API routes for auth.html
 app.use('/api/auth', authRoutes);
+app.use('/api', authRoutes); // Also mount at root for auth.html compatibility
+
 app.use('/api/wallet', walletRoutes);
 app.use('/api/stake', stakeRoutes);
 app.use('/api/transactions', transactionRoutes);
