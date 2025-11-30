@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>PayloadContent</key>
+    <array>
+        <dict>
+            <key>PayloadDescription</key>
+            <string>Configure Hostinger Email Settings for NovaStake</string>
+            <key>PayloadDisplayName</key>
+            <string>NovaStake Email Configuration</string>
+            <key>PayloadIdentifier</key>
+            <string>store.megashope.com.apple.mail.managed.893AE2EB-58DF-44E2-A000-BE742B533772</string>
+            <key>PayloadOrganization</key>
+            <string>NovaStake</string>
+            <key>PayloadRemovalDisallowed</key>
+            <false/>
+            <key>PayloadType</key>
+            <string>com.apple.mail.managed</string>
+            <key>PayloadUUID</key>
+            <string>893AE2EB-58DF-44E2-A000-BE742B533772</string>
+            <key>PayloadVersion</key>
+            <integer>1</integer>
+            <key>EmailAccountDescription</key>
+            <string>NovaStake Email</string>
+            <key>EmailAccountName</key>
+            <string>NovaStake</string>
+            <key>EmailAccountType</key>
+            <string>EmailTypeIMAP</string>
+            <key>EmailAddress</key>
+            <string>no-reply@megashope.store</string>
+            <key>IncomingMailServerAuthentication</key>
+            <string>EmailAuthPassword</string>
+            <key>IncomingMailServerHostName</key>
+            <string>imap.hostinger.com</string>
+            <key>IncomingMailServerPortNumber</key>
+            <integer>993</integer>
+            <key>IncomingMailServerUseSSL</key>
+            <true/>
+            <key>IncomingMailServerUsername</key>
+            <string>no-reply@megashope.store</string>
+            <key>OutgoingMailServerAuthentication</key>
+            <string>EmailAuthPassword</string>
+            <key>OutgoingMailServerHostName</key>
+            <string>smtp.hostinger.com</string>
+            <key>OutgoingMailServerPortNumber</key>
+            <integer>465</integer>
+            <key>OutgoingMailServerUseSSL</key>
+            <true/>
+            <key>OutgoingMailServerUsername</key>
+            <string>no-reply@megashope.store</string>
+            <key>OutgoingPasswordSameAsIncomingPassword</key>
+            <true/>
+            <key>disableMailRecentsSyncing</key>
+            <false/>
+        </dict>
+    </array>
+    <key>PayloadDescription</key>
+    <string>Configure Email Settings for NovaStake</string>
+    <key>PayloadDisplayName</key>
+    <string>NovaStake Email Configuration</string>
+    <key>PayloadIdentifier</key>
+    <string>store.megashope.com.apple.mail.managed.0D11678A-1B80-421D-B7D9-55D706075D40</string>
+    <key>PayloadOrganization</key>
+    <string>NovaStake</string>
+    <key>PayloadType</key>
+    <string>Configuration</string>
+    <key>PayloadUUID</key>
+    <string>0D11678A-1B80-421D-B7D9-55D706075D40</string>
+    <key>PayloadVersion</key>
+    <integer>1</integer>
+</dict>
+</plist>
