@@ -10,22 +10,25 @@ const primaryEmailConfig = {
         user: process.env.EMAIL_USER || 'no-reply@megashope.store',
         pass: process.env.EMAIL_PASS || 'Usman@567784'
     },
-    // Connection settings for reliability
-    pool: process.env.EMAIL_POOL === 'true', // Use connection pooling
-    maxConnections: parseInt(process.env.EMAIL_MAX_CONNECTIONS) || 5,
-    maxMessages: parseInt(process.env.EMAIL_MAX_MESSAGES) || 100,
-    rateDelta: parseInt(process.env.EMAIL_RATE_DELTA) || 1000,
-    rateLimit: parseInt(process.env.EMAIL_RATE_LIMIT) || 5,
-    // Timeout settings
-    connectionTimeout: parseInt(process.env.EMAIL_CONNECTION_TIMEOUT) || 15000, // 15 seconds
-    greetingTimeout: parseInt(process.env.EMAIL_GREETING_TIMEOUT) || 10000,   // 10 seconds
-    socketTimeout: parseInt(process.env.EMAIL_SOCKET_TIMEOUT) || 15000,     // 15 seconds
+    // Enhanced connection settings
+    pool: false, // Disable pooling for timeout issues
+    maxConnections: 1,
+    maxMessages: 10,
+    // Longer timeout settings
+    connectionTimeout: 30000, // 30 seconds
+    greetingTimeout: 15000,     // 15 seconds
+    socketTimeout: 30000,      // 30 seconds
     // TLS settings
     tls: {
-        rejectUnauthorized: process.env.TLS_REJECT_UNAUTHORIZED === 'true', // Accept self-signed certificates
-        ciphers: process.env.TLS_CIPHERS || 'SSLv3'
+        rejectUnauthorized: false, // Accept self-signed certificates
+        ciphers: 'HIGH:!aNULL:!MD5',
+        minVersion: 'TLSv1'
     },
-    // Debug settings (remove in production)
+    // Additional connection options
+    name: 'novastake.com',
+    localAddress: null,
+    connection: null,
+    // Debug settings
     debug: process.env.NODE_ENV === 'development',
     logger: process.env.NODE_ENV === 'development'
 };
@@ -39,24 +42,52 @@ const backupEmailConfig = {
         user: process.env.EMAIL_USER || 'no-reply@megashope.store',
         pass: process.env.EMAIL_PASS || 'Usman@567784'
     },
-    // Connection settings for reliability
-    pool: true,
-    maxConnections: 3,
-    maxMessages: 50,
-    rateDelta: 2000,
-    rateLimit: 3,
-    // Timeout settings
-    connectionTimeout: 10000, // 10 seconds
-    greetingTimeout: 8000,   // 8 seconds
-    socketTimeout: 10000,     // 10 seconds
+    // Enhanced connection settings
+    pool: false,
+    maxConnections: 1,
+    maxMessages: 10,
+    // Longer timeout settings
+    connectionTimeout: 30000, // 30 seconds
+    greetingTimeout: 15000,     // 15 seconds
+    socketTimeout: 30000,      // 30 seconds
     // TLS settings
     tls: {
         rejectUnauthorized: false,
-        ciphers: 'SSLv3'
+        ciphers: 'HIGH:!aNULL:!MD5',
+        minVersion: 'TLSv1'
     },
+    // Additional connection options
+    name: 'novastake.com',
+    localAddress: null,
+    connection: null,
     // Debug settings
     debug: false,
     logger: false
+};
+
+// Alternative SMTP Configuration (SendGrid fallback)
+const alternativeEmailConfig = {
+    host: 'smtp.sendgrid.net',
+    port: 587,
+    secure: false,
+    auth: {
+        user: 'apikey', // SendGrid API key
+        pass: process.env.SENDGRID_API_KEY || 'YOUR_SENDGRID_API_KEY'
+    },
+    // Enhanced connection settings
+    pool: false,
+    maxConnections: 1,
+    maxMessages: 10,
+    // Timeout settings
+    connectionTimeout: 20000,
+    greetingTimeout: 10000,
+    socketTimeout: 20000,
+    // TLS settings
+    tls: {
+        rejectUnauthorized: false,
+        ciphers: 'HIGH:!aNULL:!MD5'
+    },
+    name: 'novastake.com'
 };
 
 // Create primary transporter
@@ -64,6 +95,9 @@ const primaryTransporter = nodemailer.createTransport(primaryEmailConfig);
 
 // Create backup transporter
 const backupTransporter = nodemailer.createTransport(backupEmailConfig);
+
+// Create alternative transporter (SendGrid)
+const alternativeTransporter = nodemailer.createTransport(alternativeEmailConfig);
 
 // Verify primary connection on startup
 primaryTransporter.verify((error, success) => {
@@ -84,9 +118,23 @@ backupTransporter.verify((error, success) => {
         console.error('❌ Backup SMTP Connection Error:', error.message);
         console.error('❌ Error Code:', error.code);
         console.error('❌ Command:', error.command);
+        console.log('⚠️ Will use alternative SMTP if needed');
     } else {
         console.log('✅ Backup SMTP Server Ready: smtp.gmail.com:587');
         console.log('✅ Backup Auth User: no-reply@megashope.store');
+    }
+});
+
+// Verify alternative connection on startup
+alternativeTransporter.verify((error, success) => {
+    if (error) {
+        console.error('❌ Alternative SMTP Connection Error:', error.message);
+        console.error('❌ Error Code:', error.code);
+        console.error('❌ Command:', error.command);
+        console.log('⚠️ All SMTP servers failed, will use console fallback');
+    } else {
+        console.log('✅ Alternative SMTP Server Ready: smtp.sendgrid.net:587');
+        console.log('✅ Alternative Auth: SendGrid API');
     }
 });
 
@@ -176,7 +224,21 @@ async function sendVerificationEmail(email, verificationCode, userName) {
                 console.error('❌ Backup SMTP Also Failed:', backupError.message);
                 console.error('❌ Error Code:', backupError.code);
                 console.error('❌ Command:', backupError.command);
-                throw new Error('Both SMTP servers failed');
+                
+                console.log('🔄 Trying Alternative SMTP → smtp.sendgrid.net:587');
+                try {
+                    // Try Alternative SMTP (SendGrid)
+                    info = await alternativeTransporter.sendMail(mailOptions);
+                    console.log('✅ Alternative SMTP: Email sent successfully!');
+                    console.log('✅ Message ID:', info.messageId);
+                    console.log('✅ Response:', info.response);
+                    transporterUsed = 'alternative';
+                } catch (alternativeError) {
+                    console.error('❌ Alternative SMTP Also Failed:', alternativeError.message);
+                    console.error('❌ Error Code:', alternativeError.code);
+                    console.error('❌ Command:', alternativeError.command);
+                    throw new Error('All SMTP servers failed');
+                }
             }
         }
         
@@ -193,7 +255,9 @@ async function sendVerificationEmail(email, verificationCode, userName) {
             verificationCode: verificationCode,
             response: info.response,
             transporterUsed: transporterUsed,
-            transporterHost: transporterUsed === 'primary' ? 'mail.megashope.store' : 'smtp.gmail.com'
+            transporterHost: transporterUsed === 'primary' ? 'mail.megashope.store' : 
+                             transporterUsed === 'backup' ? 'smtp.gmail.com' : 
+                             'smtp.sendgrid.net'
         };
         
     } catch (error) {
