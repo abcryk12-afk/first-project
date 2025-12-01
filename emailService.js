@@ -8,7 +8,7 @@ const primaryEmailConfig = {
     secure: process.env.EMAIL_PORT === '465', // SSL for port 465
     auth: {
         user: process.env.EMAIL_USER || 'wanum01234@gmail.com',
-        pass: process.env.EMAIL_PASS || 'nacdmkgxynhvrwqe'
+        pass: process.env.EMAIL_PASS || 'hlyn flnr bsxw deep'
     },
     // Enhanced connection settings for Gmail
     pool: false, // Disable pooling for timeout issues
@@ -40,7 +40,7 @@ const backupEmailConfig = {
     secure: false, // STARTTLS for port 587
     auth: {
         user: process.env.EMAIL_USER || 'wanum01234@gmail.com',
-        pass: process.env.EMAIL_PASS || 'nacdmkgxynhvrwqe'
+        pass: process.env.EMAIL_PASS || 'hlyn flnr bsxw deep'
     },
     // Enhanced connection settings
     pool: false,
