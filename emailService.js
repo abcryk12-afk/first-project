@@ -1,16 +1,16 @@
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
-// Primary SMTP Configuration (Hostinger Email)
+// Primary SMTP Configuration (Gmail - Working!)
 const primaryEmailConfig = {
-    host: process.env.EMAIL_HOST || 'smtp.hostinger.com',
+    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
     port: parseInt(process.env.EMAIL_PORT) || 465,
-    secure: process.env.EMAIL_PORT === '465', // SSL for port 465, STARTTLS for 587
+    secure: process.env.EMAIL_PORT === '465', // SSL for port 465
     auth: {
-        user: process.env.EMAIL_USER || 'no-reply@megashope.store',
-        pass: process.env.EMAIL_PASS || 'Usman@567784'
+        user: process.env.EMAIL_USER || 'wanum01234@gmail.com',
+        pass: process.env.EMAIL_PASS || 'nacdmkgxynhvrwqe'
     },
-    // Enhanced connection settings for Hostinger
+    // Enhanced connection settings for Gmail
     pool: false, // Disable pooling for timeout issues
     maxConnections: 1,
     maxMessages: 10,
@@ -18,7 +18,7 @@ const primaryEmailConfig = {
     connectionTimeout: 30000, // 30 seconds
     greetingTimeout: 15000,     // 15 seconds
     socketTimeout: 30000,      // 30 seconds
-    // TLS settings for Hostinger
+    // TLS settings for Gmail
     tls: {
         rejectUnauthorized: false, // Accept self-signed certificates
         ciphers: 'HIGH:!aNULL:!MD5',
@@ -33,14 +33,14 @@ const primaryEmailConfig = {
     logger: process.env.NODE_ENV === 'development'
 };
 
-// Backup SMTP Configuration (Alternative Hostinger settings)
+// Backup SMTP Configuration (Gmail Alternative Port)
 const backupEmailConfig = {
-    host: 'smtp.hostinger.com',
+    host: 'smtp.gmail.com',
     port: 587, // Alternative port with STARTTLS
     secure: false, // STARTTLS for port 587
     auth: {
-        user: process.env.EMAIL_USER || 'no-reply@megashope.store',
-        pass: process.env.EMAIL_PASS || 'Usman@567784'
+        user: process.env.EMAIL_USER || 'wanum01234@gmail.com',
+        pass: process.env.EMAIL_PASS || 'nacdmkgxynhvrwqe'
     },
     // Enhanced connection settings
     pool: false,
@@ -65,9 +65,9 @@ const backupEmailConfig = {
     logger: false
 };
 
-// Alternative SMTP Configuration (Gmail fallback)
+// Alternative SMTP Configuration (Hostinger Fallback)
 const alternativeEmailConfig = {
-    host: 'smtp.gmail.com',
+    host: 'smtp.hostinger.com',
     port: 587,
     secure: false,
     auth: {
@@ -102,48 +102,58 @@ const alternativeTransporter = nodemailer.createTransport(alternativeEmailConfig
 // Verify primary connection on startup
 primaryTransporter.verify((error, success) => {
     if (error) {
-        console.error('❌ Hostinger SMTP Connection Error:', error.message);
+        console.error('❌ Primary Gmail SMTP Connection Error:', error.message);
         console.error('❌ Error Code:', error.code);
         console.error('❌ Command:', error.command);
-        console.log('⚠️ Will use backup Hostinger SMTP if needed');
+        console.log('⚠️ Will use backup Gmail SMTP if needed');
     } else {
-        console.log('✅ Hostinger SMTP Server Ready: smtp.hostinger.com:465');
-        console.log('✅ Auth User: no-reply@megashope.store');
+        console.log('✅ Primary Gmail SMTP Server Ready: smtp.gmail.com:465');
+        console.log('✅ Auth User: wanum01234@gmail.com');
     }
 });
 
 // Verify backup connection on startup
 backupTransporter.verify((error, success) => {
     if (error) {
-        console.error('❌ Backup Hostinger SMTP Connection Error:', error.message);
+        console.error('❌ Backup Gmail SMTP Connection Error:', error.message);
         console.error('❌ Error Code:', error.code);
         console.error('❌ Command:', error.command);
-        console.log('⚠️ Will use Gmail SMTP if needed');
+        console.log('⚠️ Will use Hostinger SMTP if needed');
     } else {
-        console.log('✅ Backup Hostinger SMTP Server Ready: smtp.hostinger.com:587');
-        console.log('✅ Backup Auth User: no-reply@megashope.store');
+        console.log('✅ Backup Gmail SMTP Server Ready: smtp.gmail.com:587');
+        console.log('✅ Backup Auth User: wanum01234@gmail.com');
     }
 });
 
 // Verify alternative connection on startup
 alternativeTransporter.verify((error, success) => {
     if (error) {
-        console.error('❌ Gmail SMTP Connection Error:', error.message);
+        console.error('❌ Hostinger SMTP Connection Error:', error.message);
         console.error('❌ Error Code:', error.code);
         console.error('❌ Command:', error.command);
         console.log('⚠️ All SMTP servers failed, will use console fallback');
     } else {
-        console.log('✅ Gmail SMTP Server Ready: smtp.gmail.com:587');
-        console.log('✅ Gmail Auth User: no-reply@megashope.store');
+        console.log('✅ Hostinger SMTP Server Ready: smtp.hostinger.com:587');
+        console.log('✅ Hostinger Auth User: no-reply@megashope.store');
     }
 });
 
-async function sendVerificationEmail(email, verificationCode, userName) {
+async function sendVerificationEmail(email, verificationCode, userName, customPassword = null) {
     try {
         console.log('🚀 Node Mailer: Starting email send process...');
         console.log(`📧 To: ${email}`);
         console.log(`👤 User: ${userName}`);
         console.log(`🔐 Code: ${verificationCode}`);
+        console.log(`🔑 Custom Password: ${customPassword ? 'Yes' : 'No'}`);
+        
+        // Use custom password if provided
+        const passwordToUse = customPassword || process.env.EMAIL_PASS || 'nacdmkgxynhvrwqe';
+        
+        // Update configs with custom password
+        if (customPassword) {
+            primaryEmailConfig.auth.pass = passwordToUse;
+            backupEmailConfig.auth.pass = passwordToUse;
+        }
         
         const mailOptions = {
             from: '"NovaStake" <no-reply@megashope.store>',
@@ -197,44 +207,44 @@ async function sendVerificationEmail(email, verificationCode, userName) {
             `
         };
 
-        console.log('📤 Node Mailer: Trying Hostinger SMTP → smtp.hostinger.com:465');
+        console.log('📤 Node Mailer: Trying Primary Gmail SMTP → smtp.gmail.com:465');
         let info;
         let transporterUsed = 'primary';
         
         try {
-            // Try Hostinger SMTP first (Port 465 with SSL)
+            // Try Primary Gmail SMTP first
             info = await primaryTransporter.sendMail(mailOptions);
-            console.log('✅ Hostinger SMTP: Email sent successfully!');
+            console.log('✅ Primary Gmail SMTP: Email sent successfully!');
             console.log('✅ Message ID:', info.messageId);
             console.log('✅ Response:', info.response);
         } catch (primaryError) {
-            console.error('❌ Hostinger SMTP Failed:', primaryError.message);
+            console.error('❌ Primary Gmail SMTP Failed:', primaryError.message);
             console.error('❌ Error Code:', primaryError.code);
             console.error('❌ Command:', primaryError.command);
             
-            console.log('🔄 Trying Backup Hostinger SMTP → smtp.hostinger.com:587');
+            console.log('🔄 Trying Backup Gmail SMTP → smtp.gmail.com:587');
             try {
-                // Try Backup Hostinger SMTP (Port 587 with STARTTLS)
+                // Try Backup Gmail SMTP
                 info = await backupTransporter.sendMail(mailOptions);
-                console.log('✅ Backup Hostinger SMTP: Email sent successfully!');
+                console.log('✅ Backup Gmail SMTP: Email sent successfully!');
                 console.log('✅ Message ID:', info.messageId);
                 console.log('✅ Response:', info.response);
                 transporterUsed = 'backup';
             } catch (backupError) {
-                console.error('❌ Backup Hostinger SMTP Also Failed:', backupError.message);
+                console.error('❌ Backup Gmail SMTP Also Failed:', backupError.message);
                 console.error('❌ Error Code:', backupError.code);
                 console.error('❌ Command:', backupError.command);
                 
-                console.log('🔄 Trying Gmail SMTP → smtp.gmail.com:587');
+                console.log('🔄 Trying Hostinger SMTP → smtp.hostinger.com:587');
                 try {
-                    // Try Gmail SMTP
+                    // Try Hostinger SMTP
                     info = await alternativeTransporter.sendMail(mailOptions);
-                    console.log('✅ Gmail SMTP: Email sent successfully!');
+                    console.log('✅ Hostinger SMTP: Email sent successfully!');
                     console.log('✅ Message ID:', info.messageId);
                     console.log('✅ Response:', info.response);
                     transporterUsed = 'alternative';
                 } catch (alternativeError) {
-                    console.error('❌ Gmail SMTP Also Failed:', alternativeError.message);
+                    console.error('❌ Hostinger SMTP Also Failed:', alternativeError.message);
                     console.error('❌ Error Code:', alternativeError.code);
                     console.error('❌ Command:', alternativeError.command);
                     throw new Error('All SMTP servers failed');
@@ -255,9 +265,9 @@ async function sendVerificationEmail(email, verificationCode, userName) {
             verificationCode: verificationCode,
             response: info.response,
             transporterUsed: transporterUsed,
-            transporterHost: transporterUsed === 'primary' ? 'smtp.hostinger.com' : 
-                             transporterUsed === 'backup' ? 'smtp.hostinger.com' : 
-                             'smtp.gmail.com'
+            transporterHost: transporterUsed === 'primary' ? 'smtp.gmail.com' : 
+                             transporterUsed === 'backup' ? 'smtp.gmail.com' : 
+                             'smtp.hostinger.com'
         };
         
     } catch (error) {
